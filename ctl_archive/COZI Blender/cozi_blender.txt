@@ -1,0 +1,2 @@
+This .ctl can communicate with the COZI lab blender to allow for remote control. 
+It is very much a WIP version, but might eventually be the groundwork for automated calibration cylces e.g. MP-NO or NO2 by gas phase titration.

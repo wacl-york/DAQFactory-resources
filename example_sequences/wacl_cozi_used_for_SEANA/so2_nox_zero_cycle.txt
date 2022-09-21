@@ -1,0 +1,12 @@
+time 0
+   device.t101_so2.Write("C 100 ZERO" + chr(13) + chr(10))
+   so2_zero=1
+   zeroBox=1
+
+delay (zero_time)
+   device.t101_so2.Write("C 100 EXIT" + chr(13) + chr(10))
+   so2_zero=0
+   zeroBox=0
+
+delay (zero_delay) // 82800 is every 23 hours
+goto 0

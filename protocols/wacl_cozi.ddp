@@ -1,0 +1,413 @@
+U,wacl_cozi
+I,getno,0,input,numeric
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ENDIO
+
+F,Poll,0
+function Poll(string out, until)
+// this function will poll the port with given string and read
+// the response until the given character.  Returns NULL (empty)
+// if there is an error
+
+if (argc < 2)
+   throw("Invalid number of parameters")
+endif
+private string in
+try
+   // lock the port
+   if (!LockPort())
+      throw("Unable to lock port")
+   endif
+   // clear anything pending
+   Purge()
+   // output our string
+   Write(out)
+   // and read until the eol:
+   in = ReadUntil(until) 
+   // release the port
+   UnlockPort()
+   // and return the response
+   return(in)
+catch()
+   // error occured
+   UnlockPort()
+   throw()
+endcatch
+// return NULL to indicate error.  This should never happen
+// because of the throw() statement above
+return(NULL)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ENDIO
+
+F,messages,0
+function messages(string inst)
+   
+   if(inst == "t101")
+      return({"SO2", "SAMPFLOW", "SAMPPRESS", "PMTDET","UVDET","LAMPRATIO", "SO2SLOPE", "SO2OFFSET", "H2S","H2SSLOPE","H2SOFFSET", "HVPS", "RCELLTEMP", "BOXTEMP","PMTTEMP", "CONVTEMP"})
+   endif
+   
+   if(inst == "al5002")
+      return({"CONC?", "SIG?", "ZERO?", "SENS?","TEMP? M","TEMP? L","TEMP? C","PRESS? L", "PRESS? C", "PRESS? F", "FLOW? M", "FLOW? L"})
+   endif
+   
+   if(inst  == "t200up")
+      return({"NO", "NO2", "NOX", "SAMPPRESS", "SAMPFLOW","OZONFLOW", "HVPS", "RCELLTEMP", "BOXTEMP", "PMTTEMP", "CONVTEMP", "RCELLPRESS", "NOSLOPE", "NOOFFSET", "NOXSLOPE"})
+   endif
+   
+   if(inst == "thermo49i")
+      return({"O3", "BENCH TEMP", "FLOW A", "FLOW B", "LAMP TEMP", "PRES"})
+   endif
+   
+   if(inst == "thermo49imin")// minimum params for limited channels
+      return({"O3", "FLOW A", "FLOW B"})
+   endif
+   
+   if(inst == "thermo43i")
+      return({"SO2", "gas mode", "conv temp", "flow", "internal temp", "pmt voltage", "pres", "react temp"})
+   endif
+   
+   if(inst == "aqguard")
+      return({"0", "1", "2", "3", "4", "5", "6", "23", "24", "26", "27", "35", "36", "40", "41", "47", "50", "51", "60", "61", "62", "63", "64", "65"})
+   endif
+   
+   if(inst == "aqguardBins")
+      return({"110", "111", "112", "113", "114", "115", "116", "117", "118", "119", "120", "121", "123", "124", "125", "126", "127", "128", "129", "130", "131", "132", "133", "134", "135", "136", "137", "138", "139", "140", "141", "142", "143", "144", "145", "146", "147", "148", "149", "150", "151", "152", "153", "154", "155", "156", "157", "158", "159", "160", "161", "162", "163", "164", "165", "166", "167", "168", "169", "170", "171", "172", "173"})
+   endif
+
+
+
+
+
+
+
+
+
+
+
+
+ENDIO
+
+F,createChannels,0
+function createChannels(string inst,string uid, myHistoryLength)
+   
+   private string myChannelNames = channelNames(inst, uid)
+   
+   for(private i = 0, i < numRows(myChannelNames), i++)
+
+      channel.Add(myChannelNames[i])
+      
+      execute(myChannelNames[i]+".HistoryLength = myHistoryLength")
+      
+   endfor
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ENDIO
+
+F,parseResponse,0
+function parseResponse(string response, string inst)
+   
+   private responseParsed
+   private string responseParsedString
+ // turn into a case statement?  
+   if(inst == "t101" | inst == "t200up")
+      responseParsed = strToDouble(parse(parse(response, 1, "="), 0, " "))
+   endif
+   
+   if(inst == "al5002")
+      responseParsed = strToDouble(response)
+   endif
+   
+   if(inst == "thermo49i" | inst == "thermo49imin"  | inst == "thermo43i")
+      responseParsed = strToDouble(parse(response, 1, " "))
+      
+      if(responseParsed == NaN())
+         responseParsed = strToDouble(parse(response, 2, " "))
+      endif
+         
+   endif
+   
+   if(inst == "aqguard")
+      responseParsedString = parse(response,0,">")
+      
+      responseParsedString = parse(responseParsedString,-1,";")
+      
+         for(private i = 0, i < numRows(responseParsedString),i++)
+            responseParsedString[i] = parse(responseParsedString[i],1,"=")
+         endfor 
+         
+      return(responseParsedString)
+   endif
+   
+   return(responseParsed)
+   
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ENDIO
+
+F,getAll,0
+function getAll(string inst, string uid, string messageStart)
+   
+   private string myMessages = messages(inst)
+   private string myChannels = channelNames(inst, uid)
+   private string thisMessage
+   private string thisResponse
+   private responseParsed
+   private string responseParsedAQGuard
+   
+   
+   
+   switch
+      case(inst != "aqguard")
+      
+         for(private i = 0, i < numRows(myMessages), i++)
+            try 
+               thisMessage = messageStart+myMessages[i]+chr(13)
+               thisResponse = Poll(thisMessage, 13)
+               responseParsed = parseResponse(thisResponse, inst)
+               execute(myChannels[i]+".AddValue(responseParsed)")
+            catch()
+               execute(myChannels[i]+".AddValue(1/0)")
+            endcatch
+       
+         endfor
+         
+      case(inst == "aqguard")
+      
+         private string messageArray = device.aqguard.messages("aqguard")
+         thisMessage = messageArray[0]
+
+         for(private i = 1, i < NumRows(messageArray),i++)
+            thisMessage = thisMessage+";"+messageArray[i]
+         endfor
+   
+         thisMessage = "<getVal"+thisMessage+">"+chr(13)+chr(10)
+         thisResponse = Poll(thisMessage, 13)
+         responseParsedAQGuard = parseResponse(thisResponse, inst)
+         
+         for(private i = 0, i < NumRows(messageArray),i++)
+            try
+               execute(myChannels[i]+".AddValue(strToDouble(responseParsedAQGuard[i]))")
+            catch()
+               execute(myChannels[i]+".AddValue(1/0)")
+            endcatch
+         endfor
+         
+      endcase
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ENDIO
+
+F,channelNames,0
+function channelNames(string inst, string uid)
+   
+   private string myMessages = remove(messages(inst)," ")
+   myMessages = remove(myMessages, "?")
+   
+   private string myChannelNames
+   
+   for(private i = 0, i < numRows(myMessages), i++)
+      
+      myChannelNames[i] = inst+"_"+uid+"_"+myMessages[i]
+   
+   endfor
+   
+   return(myChannelNames)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ENDIO
+
+E,OnLoad
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ENDIO
+
+E,OnUnload
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ENDIO
+
+E,OnReceive
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ENDIO
+
+E,OnSend
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ENDIO
+

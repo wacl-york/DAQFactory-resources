@@ -1,0 +1,11 @@
+global string zeroCycleTracker = ""
+
+time 0
+   if(Sequence.so2_nox_zero_cycle.Running)
+      zeroCycleTracker = "running"
+   else
+      zeroCycleTracker = "paused"
+   endif
+   
+time 1
+   goto 0

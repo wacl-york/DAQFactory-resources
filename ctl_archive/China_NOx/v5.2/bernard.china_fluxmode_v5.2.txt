@@ -1,0 +1,2 @@
+"bernard.china_fluxmode_v5.2.ctl" operates the "China" AQD NOx instrument as a NOx flux instrument at the BTT. 
+It addtionally logs a Gill Sonic Anemometer and a Thermo49i

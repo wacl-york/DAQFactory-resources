@@ -1,0 +1,17 @@
+time 0
+   
+   device.t101_so2.getAll("t101",uidSO2,"T ")
+   
+   device.al5002_co.getAll("al5002",uidCO, "")
+   
+   device.t200up_noy.getAll("t200up", uidNOy, "T ")
+   
+   device.t200up_nox.getAll("t200up", uidNOx, "T ")
+   
+   //device.thermo49i_o3.getAll("thermo49imin", uidO3, chr(178)) //the number in chr is 128+instrument id
+   
+   so2_zeroChannel.addValue(so2_zero)
+   
+time 1
+
+   goto 0

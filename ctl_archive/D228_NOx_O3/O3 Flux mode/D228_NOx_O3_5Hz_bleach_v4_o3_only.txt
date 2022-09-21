@@ -1,0 +1,2 @@
+"D228_NOx_O3_5Hz_bleach_v4_o3_only.ctl" operated and logged the AQD "D228" instrument on the BLEACH campaign in summer 2022 when it was making O3 Flux measurements
+It also logged a TSI 4043 flow meter and a RM Young ultrasonic anemometer

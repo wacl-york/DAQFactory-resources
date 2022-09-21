@@ -1,0 +1,67 @@
+time 0
+// instrument unique IDs
+global string uidSO2 = "022639"
+global string uidNOx = "023828"
+global string uidNOy = "021842"
+global string uidCO = "instCO"
+global string uidO3 = "instO3"
+
+//file path
+global string fp = "C:/Users/wacl_logger_5/desktop/wacl_logger_5/data/senna_"
+
+// zero defaults
+global zero_delay=82800
+global zero_time=600
+global so2_zero = 0
+
+// graph controls
+global scaleNOx  = 5
+global scaleNOy = 10
+global scaleCO = 300
+global scaleSO2 = 5
+global scaleO3 = 20
+global scalex = 3600
+
+
+//clear channels
+channel.ClearAll()
+
+//Setup instruments
+device.t101_so2.createChannels("t101", uidSO2, 36000)
+device.al5002_co.createChannels("al5002", uidCO, 36000)
+device.t200up_noy.createChannels("t200up", uidNOy, 36000)
+device.t200up_nox.createChannels("t200up", uidNOx, 36000)
+//device.thermo49i_o3.createChannels("thermo49imin", uidO3, 36000) // O3 is 49iq - no clink!
+
+//Setup zero box
+
+channel.Add("zeroBox", "LabJackUD", 0, "Dig Out", 7)
+zeroBox.HistoryLength = 36000
+
+// setup SO2 Zero
+
+channel.Add("so2_zeroChannel")
+so2_zeroChannel.HistoryLength = 36000
+
+so2_zeroChannel.addValue(so2_zero)
+
+//Setup Thermo 49iq
+channel.Add("thermo_time","thermo49i_o3",2,"Input",90) // channel numbers have to match the `thermo` OnRecieve protocol
+channel.Add("o3","thermo49i_o3",2,"Input",91)
+
+time 1
+
+if(FormatDateTime("%S",SysTime()) == "00")
+
+   beginseq(pollAll)
+   beginseq(logging)
+   beginseq(misc)
+   beginseq(so2_nox_zero_cycle)
+   
+else
+
+   goto 1
+   
+endif
+
+
