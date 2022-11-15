@@ -82,40 +82,41 @@ ENDIO
 
 F,messages,0
 function messages(string inst)
-   
-   if(inst == "t101")
-      return({"SO2", "SAMPFLOW", "SAMPPRESS", "PMTDET","UVDET","LAMPRATIO", "SO2SLOPE", "SO2OFFSET", "H2S","H2SSLOPE","H2SOFFSET", "HVPS", "RCELLTEMP", "BOXTEMP","PMTTEMP", "CONVTEMP"})
-   endif
-   
-   if(inst == "al5002")
-      return({"CONC?", "SIG?", "ZERO?", "SENS?","TEMP? M","TEMP? L","TEMP? C","PRESS? L", "PRESS? C", "PRESS? F", "FLOW? M", "FLOW? L"})
-   endif
-   
-   if(inst  == "t200up")
-      return({"NO", "NO2", "NOX", "SAMPPRESS", "SAMPFLOW","OZONFLOW", "HVPS", "RCELLTEMP", "BOXTEMP", "PMTTEMP", "CONVTEMP", "RCELLPRESS", "NOSLOPE", "NOOFFSET", "NOXSLOPE"})
-   endif
-   
-   if(inst == "thermo49i")
-      return({"O3", "BENCH TEMP", "FLOW A", "FLOW B", "LAMP TEMP", "PRES"})
-   endif
-   
-   if(inst == "thermo49imin")// minimum params for limited channels
-      return({"O3", "FLOW A", "FLOW B"})
-   endif
-   
-   if(inst == "thermo43i")
-      return({"SO2", "gas mode", "conv temp", "flow", "internal temp", "pmt voltage", "pres", "react temp"})
-   endif
-   
-   if(inst == "aqguard")
-      return({"0", "1", "2", "3", "4", "5", "6", "23", "24", "26", "27", "35", "36", "40", "41", "47", "50", "51", "60", "61", "62", "63", "64", "65"})
-   endif
-   
-   if(inst == "aqguardBins")
-      return({"110", "111", "112", "113", "114", "115", "116", "117", "118", "119", "120", "121", "123", "124", "125", "126", "127", "128", "129", "130", "131", "132", "133", "134", "135", "136", "137", "138", "139", "140", "141", "142", "143", "144", "145", "146", "147", "148", "149", "150", "151", "152", "153", "154", "155", "156", "157", "158", "159", "160", "161", "162", "163", "164", "165", "166", "167", "168", "169", "170", "171", "172", "173"})
-   endif
 
-
+	switch
+		case(inst == "t101")
+			return({"SO2", "SAMPFLOW", "SAMPPRESS", "PMTDET","UVDET","LAMPRATIO", "SO2SLOPE", "SO2OFFSET", "H2S","H2SSLOPE","H2SOFFSET", "HVPS", "RCELLTEMP", "BOXTEMP","PMTTEMP", "CONVTEMP"})
+   
+		case(inst == "al5002")
+			return({"CONC?", "SIG?", "ZERO?", "SENS?","TEMP? M","TEMP? L","TEMP? C","PRESS? L", "PRESS? C", "PRESS? F", "FLOW? M", "FLOW? L"})
+   
+		case(inst  == "t200up")
+			return({"NO", "NO2", "NOX", "SAMPPRESS", "SAMPFLOW","OZONFLOW", "HVPS", "RCELLTEMP", "BOXTEMP", "PMTTEMP", "CONVTEMP", "RCELLPRESS", "NOSLOPE", "NOOFFSET", "NOXSLOPE"})
+   
+		case(inst == "thermo49i")
+			return({"O3", "BENCH TEMP", "FLOW A", "FLOW B", "LAMP TEMP", "PRES"})
+   
+		case(inst == "thermo49imin")// minimum params for limited channels
+			return({"O3", "FLOW A", "FLOW B"})
+   
+		case(inst == "thermo43i")
+			return({"SO2", "gas mode", "conv temp", "flow", "internal temp", "pmt voltage", "pres", "react temp"})
+			
+		case(inst == "aqguard")
+			return({"0", "1", "2", "3", "4", "5", "6", "23", "24", "26", "27", "35", "36", "40", "41", "47", "50", "51", "60", "61", "62", "63", "64", "65"})
+   
+		case(inst == "aqguardBins")
+			return({"110", "111", "112", "113", "114", "115", "116", "117", "118", "119", "120", "121", "123", "124", "125", "126", "127", "128", "129", "130", "131", "132", "133", "134", "135", "136", "137", "138", "139", "140", "141", "142", "143", "144", "145", "146", "147", "148", "149", "150", "151", "152", "153", "154", "155", "156", "157", "158", "159", "160", "161", "162", "163", "164", "165", "166", "167", "168", "169", "170", "171", "172", "173"})
+			
+		case(inst == "t300u")
+			return({"CO", "COMEAS","COREF", "MRRATIO", "SAMPPRESS", "SAMPFLOW", "BENCHTEMP","WHEELTEMP","OVENTEMP","COSLOPE", "COOFFSET","STABILITY"})
+			
+		case(inst == "t500u")
+			return({"NO2", "PHASE", "SAMPPRESS","SAMPTEMP","BOXTEMP","SLOPE","OFFSET","STABILITY","AUTOREF","OVENTEMP"})
+			
+		case(inst == "thermo450i")
+			return({"SO", "H2S", "CONV TEMP", "FLOW","INTERNAL TEMP", "PMT VOLTAGE", "PRES", "REACT TEMP"})
+	endcase
 
 
 
@@ -162,25 +163,22 @@ function parseResponse(string response, string inst)
    
    private responseParsed
    private string responseParsedString
- // turn into a case statement?  
-   if(inst == "t101" | inst == "t200up")
-      responseParsed = strToDouble(parse(parse(response, 1, "="), 0, " "))
-   endif
    
-   if(inst == "al5002")
-      responseParsed = strToDouble(response)
-   endif
+   switch
+	case(inst == "t101" | inst == "t200up" | inst == "t300u" | inst == "t500u")
+		responseParsed = strToDouble(parse(parse(response, 1, "="), 0, " "))
    
-   if(inst == "thermo49i" | inst == "thermo49imin"  | inst == "thermo43i")
-      responseParsed = strToDouble(parse(response, 1, " "))
+	case(inst == "al5002")
+		responseParsed = strToDouble(response)
       
-      if(responseParsed == NaN())
-         responseParsed = strToDouble(parse(response, 2, " "))
-      endif
-         
-   endif
-   
-   if(inst == "aqguard")
+    case(inst == "thermo49i" | inst == "thermo49imin"  | inst == "thermo43i" | inst == "thermo450i")
+		responseParsed = strToDouble(parse(response, 1, " "))
+      
+		if(responseParsed == NaN())
+			responseParsed = strToDouble(parse(response, 2, " "))
+		endif
+	
+	case(inst == "aqguard")
       responseParsedString = parse(response,0,">")
       
       responseParsedString = parse(responseParsedString,-1,";")
@@ -190,7 +188,8 @@ function parseResponse(string response, string inst)
          endfor 
          
       return(responseParsedString)
-   endif
+	  
+	endcase
    
    return(responseParsed)
    
@@ -234,6 +233,8 @@ function getAll(string inst, string uid, string messageStart)
             catch()
                execute(myChannels[i]+".AddValue(1/0)")
             endcatch
+			
+			delay(0.4)
        
          endfor
          
@@ -256,6 +257,8 @@ function getAll(string inst, string uid, string messageStart)
             catch()
                execute(myChannels[i]+".AddValue(1/0)")
             endcatch
+			
+			delay(0.4)
          endfor
          
       endcase
@@ -410,4 +413,3 @@ E,OnSend
 
 
 ENDIO
-
