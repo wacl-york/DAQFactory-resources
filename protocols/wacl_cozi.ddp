@@ -170,7 +170,7 @@ function createChannels(string inst,string uid, myHistoryLength)
 ENDIO
 
 F,parseResponse,0
-function parseResponse(string response, string inst)
+function parseResponse(string response, string inst, messageIndex)
    
    private responseParsed
    private string responseParsedString
