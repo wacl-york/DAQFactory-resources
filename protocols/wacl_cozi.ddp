@@ -91,8 +91,8 @@ function messages(string inst)
 			return({"CONC?", "SIG?", "ZERO?", "SENS?","TEMP? M","TEMP? L","TEMP? C","PRESS? L", "PRESS? C", "PRESS? F", "FLOW? M", "FLOW? L"})
    
 		case(inst  == "t200up")
-			return({"NO", "NO2", "NOX", "SAMPPRESS", "SAMPFLOW","OZONFLOW", "HVPS", "RCELLTEMP", "BOXTEMP", "PMTTEMP", "CONVTEMP", "RCELLPRESS", "NOSLOPE", "NOOFFSET", "NOXSLOPE"})
-   
+			return({"NO", "NO2", "NOX", "SAMPPRESS", "SAMPFLOW","OZONEFLOW", "HVPS", "RCELLTEMP", "BOXTEMP", "PMTTEMP", "CONVTEMP", "RCELLPRESS", "NOSLOPE", "NOOFFSET", "NOXSLOPE", "NOXOFFSET"})
+
 		case(inst == "thermo49i")
 			return({"O3", "BENCH TEMP", "FLOW A", "FLOW B", "LAMP TEMP", "PRES"})
    
@@ -128,6 +128,17 @@ function messages(string inst)
 
 
 ENDIO
+
+F,responseFromMessage,0
+function responseFromMessage(string inst)
+
+	switch
+		case(inst == "t200up")
+			return({"NO", "NO2", "NOX", "SAMP", "SAMP FLW","O3GEN FL", "HVPS", "RCELL TEMP", "BOX TEMP", "PMT TEMP", "O3KL TEMP", "RCEL", "NO SLOPE", "NO OFFS", "NOX SLOPE", "NOX OFFS"})
+	endcase
+
+ENDIO
+
 
 F,createChannels,0
 function createChannels(string inst,string uid, myHistoryLength)
@@ -165,8 +176,18 @@ function parseResponse(string response, string inst)
    private string responseParsedString
    
    switch
-	case(inst == "t101" | inst == "t200up" | inst == "t300u" | inst == "t500u")
+	case(inst == "t101" | inst == "t300u" | inst == "t500u")
 		responseParsed = strToDouble(parse(parse(response, 1, "="), 0, " "))
+		
+	case(inst == "t200up")
+	  private string allResponses = responseFromMessage(inst)
+	  private string expectedResponse = allResponses[messageIndex]+"="
+	  private check = Find(response,expectedResponse,0) != -1
+	  if(check)
+		responseParsed = strToDouble(parse(parse(response, 1, "="), 0, " "))
+	  else
+		responseParsed = 1/0
+	  endif
    
 	case(inst == "al5002")
 		responseParsed = strToDouble(response)
@@ -228,7 +249,7 @@ function getAll(string inst, string uid, string messageStart)
             try 
                thisMessage = messageStart+myMessages[i]+chr(13)
                thisResponse = Poll(thisMessage, 13)
-               responseParsed = parseResponse(thisResponse, inst)
+               responseParsed = parseResponse(thisResponse, inst, i)
                execute(myChannels[i]+".AddValue(responseParsed)")
             catch()
                execute(myChannels[i]+".AddValue(1/0)")
@@ -249,7 +270,7 @@ function getAll(string inst, string uid, string messageStart)
    
          thisMessage = "<getVal"+thisMessage+">"+chr(13)+chr(10)
          thisResponse = Poll(thisMessage, 13)
-         responseParsedAQGuard = parseResponse(thisResponse, inst)
+         responseParsedAQGuard = parseResponse(thisResponse, inst, -1)
          
          for(private i = 0, i < NumRows(messageArray),i++)
             try
