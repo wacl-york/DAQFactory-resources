@@ -115,7 +115,11 @@ function messages(string inst)
 			return({"NO2", "PHASE", "SAMPPRESS","SAMPTEMP","BOXTEMP","SLOPE","OFFSET","STABILITY","AUTOREF","OVENTEMP"})
 			
 		case(inst == "thermo450i")
-			return({"SO", "H2S", "CONV TEMP", "FLOW","INTERNAL TEMP", "PMT VOLTAGE", "PRES", "REACT TEMP"})
+			return({"SO2", "H2S", "CONV TEMP", "FLOW","INTERNAL TEMP", "PMT VOLTAGE", "PRES", "REACT TEMP"})
+
+		case(inst == "thermo42C")
+			return({"NO","PRES","SAMPLE FLOW","OZONATOR FLOW","REACT TEMP","PMT TEMP","PMT VOLTAGE","CONV TEMP"})
+
 	endcase
 
 
@@ -192,7 +196,7 @@ function parseResponse(string response, string inst, messageIndex)
 	case(inst == "al5002")
 		responseParsed = strToDouble(response)
       
-    case(inst == "thermo49i" | inst == "thermo49imin"  | inst == "thermo43i" | inst == "thermo450i")
+    case(inst == "thermo49i" | inst == "thermo49imin"  | inst == "thermo43i" | inst == "thermo450i" | inst == "thermo42C")
 		responseParsed = strToDouble(parse(response, 1, " "))
       
 		if(responseParsed == NaN())
