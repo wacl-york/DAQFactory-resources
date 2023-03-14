@@ -155,26 +155,25 @@ function createChannels(string inst,string uid, myHistoryLength)
    
    private string myChannelNames = channelNames(inst, uid)
    
-   for(private i = 0, i < numRows(myChannelNames), i++)
-
-      channel.Add(myChannelNames[i])
+   switch
+	case(argc == 3)
+		for(private i = 0, i < numRows(myChannelNames), i++)
+	
+			channel.Add(myChannelNames[i])
       
-      execute(myChannelNames[i]+".HistoryLength = myHistoryLength")
+			execute(myChannelNames[i]+".HistoryLength = myHistoryLength")
       
-   endfor
-
-
-
-
-
-
-
-
-
-
-
-
-
+		endfor
+		
+	case(argc == 4) // in the case where a group name has been provided
+		for(private i = 0, i < numRows(myChannelNames), i++)
+	
+			channel.Add(myChannelNames[i],"test", 1, "A to D", 0,0,0,"",arg3)
+      
+			execute(myChannelNames[i]+".HistoryLength = myHistoryLength")
+      
+		endfor
+	endcase
 
 
 ENDIO
