@@ -86,6 +86,9 @@ function messages(string inst)
 	switch
 		case(inst == "t101")
 			return({"SO2", "SAMPFLOW", "SAMPPRESS", "PMTDET","UVDET","LAMPRATIO", "SO2SLOPE", "SO2OFFSET", "H2S","H2SSLOPE","H2SOFFSET", "HVPS", "RCELLTEMP", "BOXTEMP","PMTTEMP", "CONVTEMP"})
+			
+		case(inst == "t100u")	
+			return({"SO2", "SAMPFLOW", "SAMPPRESS", "PMTDET","UVDET","LAMPRATIO", "SLOPE", "OFFSET", "HVPS", "RCELLTEMP", "BOXTEMP","PMTTEMP"})
    
 		case(inst == "al5002")
 			return({"CONC?", "SIG?", "ZERO?", "SENS?","TEMP? M","TEMP? L","TEMP? C","PRESS? L", "PRESS? C", "PRESS? F", "FLOW? M", "FLOW? L"})
@@ -119,6 +122,9 @@ function messages(string inst)
 
 		case(inst == "thermo42C")
 			return({"NO","PRES","SAMPLE FLOW","OZONATOR FLOW","REACT TEMP","PMT TEMP","PMT VOLTAGE","CONV TEMP"})
+			
+		case(inst == "thermo42i")
+			return({"NO","NO2","NOX","PRES","SAMPLE FLOW","OZONATOR FLOW","REACT TEMP","PMT TEMP","PMT VOLTAGE","CONV TEMP"})
 
 	endcase
 
@@ -180,7 +186,7 @@ function parseResponse(string response, string inst, messageIndex)
    private string responseParsedString
    
    switch
-	case(inst == "t101" | inst == "t300u" | inst == "t500u")
+	case(inst == "t100u" | inst == "t101" | inst == "t300u" | inst == "t500u")
 		responseParsed = strToDouble(parse(parse(response, 1, "="), 0, " "))
 		
 	case(inst == "t200up")
@@ -196,7 +202,7 @@ function parseResponse(string response, string inst, messageIndex)
 	case(inst == "al5002")
 		responseParsed = strToDouble(response)
       
-    case(inst == "thermo49i" | inst == "thermo49imin"  | inst == "thermo43i" | inst == "thermo450i" | inst == "thermo42C")
+    case(inst == "thermo49i" | inst == "thermo49imin"  | inst == "thermo43i" | inst == "thermo450i" | inst == "thermo42C" | inst == "thermo42i")
 		responseParsed = strToDouble(parse(response, 1, " "))
       
 		if(responseParsed == NaN())
