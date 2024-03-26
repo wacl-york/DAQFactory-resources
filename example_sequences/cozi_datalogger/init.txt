@@ -1,0 +1,214 @@
+time 0
+endseq(pollAll)
+endseq(saveSwitches)
+endseq(logging)
+
+// wait 10 seconds to let any running poll sequences stop
+time 10
+channel.ClearAll()
+classSwitchState()
+
+
+
+time 11
+
+// instrument friendlyNames
+private string friendlyO3 = {"O3_1","O3_2","O3_3","O3_4","O3_5","O3_6","O3_7","O3_8","O3_9","O3_10","O3_11","O3_12","O3_13","O3_CAL","O3_2BCAL", "O3_2B_GUEST","O3_guest"}
+private string friendlyNOx = {"NO_1","NO2_1","NO2_2","NO2_3","NOx_1","NOx_2","NOx_3","NOx_4","NOx_6","NOx_CAL"}
+private string friendlyCO = {"CO_1","CO_2","CO_3","CO_4"}
+private string friendlySO2 = {"SO2_1","SO2_2","SO2_3","SO2_4","SO2_5"}
+global string friendlyNames = Concat(friendlyO3,Concat(friendlyNOx,Concat(friendlyCO,friendlySO2)))
+
+// instrument switchChannels
+
+private loadFail = 0
+
+try
+   private handle = file.open("c:\users\cozi_user\desktop\coziswitches.json",1,0,0,0)
+   private string dataIn = file.read(handle,file.getLength(handle))
+   file.close(handle)
+   global ss = fromJson(dataIn)
+catch() // if the settings can't be loaded, set all switches to zero
+   loadFail = 1
+   for(private i = 0, i < numRows(friendlyNames), i++)
+   
+      private string enableName = "switch_enable_"+friendlyNames[i]
+      private string manifoldName = "switch_manifold_"+friendlyNames[i]
+
+      channel.Add(enableName, "test", 99, "D to A", i,0,0,"","switch") // need different device/channel numbers otherwise all channels are affected by all switches
+      channel.Add(manifoldName, "test", 100, "D to A", i,0,0,"","switch")
+      execute(enableName+".AddValue(0)")
+      execute(manifoldName+".AddValue(0)")
+   endfor
+endcatch
+
+if(loadFail == 0) // if the settings can be loaded, set the initial channel value to them.
+   for(private i = 0, i < numRows(friendlyNames), i++)
+   
+      private string enableName = "switch_enable_"+friendlyNames[i]
+      private string manifoldName = "switch_manifold_"+friendlyNames[i]
+      private enableLoad = 0
+      private manifoldLoad = 0
+      
+      channel.Add(enableName, "test", 99, "D to A", i,0,0,"","switch") // need different device/channel numbers otherwise all channels are affected by all switches
+      channel.Add(manifoldName, "test", 100, "D to A", i,0,0,"","switch")
+      
+      for(private j = 0, j < numRows(ss.switchChannels), j++)
+         if(enableName == ss.switchChannels[j])
+            execute(enableName+".AddValue("+ss.switchCurrentState[j]+")")
+            enableLoad = 1
+         endif
+         
+         if(manifoldName == ss.switchChannels[j])
+            execute(manifoldName+".AddValue("+ss.switchCurrentState[j]+")")
+            manifoldLoad = 1
+         endif
+      endfor
+      
+      if(enableLoad == 0)
+         execute(enableName+".AddValue(0)")
+      endif
+      
+      if(manifoldLoad == 0)
+         execute(manifoldName+".AddValue(0)")
+      endif
+      
+   endfor
+endif
+
+// instrument ids
+
+global string uidO3_1  = "0536414593"
+global string uidO3_2  = "1008241388"
+global string uidO3_3  = "708621224"
+global string uidO3_4  = "730525419"
+global string uidO3_5  = "1008241369"
+global string uidO3_6  = ""
+global string uidO3_7  = "312DB"
+global string uidO3_8  = "CM10410410079"
+global string uidO3_9  = "1152780002"
+global string uidO3_10 = "1152780003"
+global string uidO3_11 = "1180160010"
+global string uidO3_12 = "1433963617"
+global string uidO3_13 = "1752DB"
+global string uidO3_CAL = "703820527"
+global string uidO3_2BCAL = "2B_CAL"
+global string uidO3_guest = "49_guest"
+global string uidO3_2B_GUEST = "2B_guest"
+
+global string uidNO2_1 = "021732"
+global string uidNO2_2 = "022838"
+global string uidNO2_3 = "021902"
+
+global string uidNOx_1 = "023828"
+global string uidNOx_2 = "022079"
+global string uidNOx_3 = "021842"
+global string uidNOx_4 = "023312"
+global string uidNOx_6 = "1433963619"
+global string uidNOx_CAL = ""
+
+global string uidNO_1 = "42CTL60720328"
+
+global string uidCO_1 = "0059"
+global string uidCO_2 = "154"
+global string uidCO_3 = ""
+global string uidCO_4 = "025583"
+
+global string uidSO2_1 = "1118248674"
+global string uidSO2_2 = "1161690004"
+global string uidSO2_3 = "022130"
+global string uidSO2_4 = "022639"
+global string uidSO2_5 = "43CTL64558352"
+
+//file path
+global string fpRoot = "C:/Users/COZI_USER/documents/COZI_DATA/"
+global string fp = fpRoot+"cozi_all_data_"
+
+
+// graph controls
+global scaleNO  = 20
+global scaleNO2  = 20
+global scaleNOx  = 40
+global scaleCO = 1
+global scaleSO2 = 20
+global scaleO3 = 600
+global scaleXCO = 36000
+global scaleXNOx = 36000
+global scaleXSO2 = 36000
+global scaleXO3 = 36000
+scaleXCore = 36000
+
+// O3 Autocal
+
+global string o3_autocal_status = "not calibrating"
+global o3_autocal_progress = 0
+global o3_autocal_custom_level = 0
+
+//setup instruments
+// one day it might be sensible to create an array of instrument type, uid, history and group (friendly name) and just loop this bit
+
+// O3
+device.O3_1.createChannels("thermo49i", uidO3_1, 21600, "O3_1")
+device.O3_2.createChannels("thermo49i", uidO3_2, 21600, "O3_2")
+device.O3_3.createChannels("thermo49i", uidO3_3, 21600, "O3_3")
+device.O3_4.createChannels("thermo49i", uidO3_4, 21600, "O3_4")
+device.O3_5.createChannels("thermo49i", uidO3_5, 21600, "O3_5")
+// O3_6 still to configure
+beginseq(createO3_7) //should add this code to the wacl_cozi.dpp at some point 
+device.O3_8.createChannels("thermo49i", uidO3_8, 21600, "O3_8")
+device.O3_9.createChannels("thermo49i", uidO3_9, 21600, "O3_9")
+device.O3_10.createChannels("thermo49i", uidO3_10, 21600, "O3_10")
+device.O3_11.createChannels("thermo49i", uidO3_11, 21600, "O3_11")
+device.O3_12.createChannels("thermo49i", uidO3_12, 21600, "O3_12")
+beginseq(createO3_13)
+beginseq(createO3_2B_GUEST)
+device.O3_CAL.createChannels("thermo49i", uidO3_CAL, 21600, "O3_CAL")
+device.O3_guest.createChannels("thermo49i", uidO3_guest, 21600, "O3_guest")
+
+// NO
+device.NO_1.createChannels("thermo42C", uidNO_1, 21600, "NO_1")
+
+// NO2
+device.NO2_1.createChannels("t500u", uidNO2_1, 21600, "NO2_1")
+device.NO2_2.createChannels("t500u", uidNO2_2, 21600, "NO2_2")
+device.NO2_3.createChannels("t500u", uidNO2_3, 21600, "NO2_3")
+
+// NOx
+device.NOx_1.createChannels("t200up", uidNOx_1, 21600, "NOx_1")
+device.NOx_2.createChannels("t200up", uidNOx_2, 21600, "NOx_2")
+device.NOx_3.createChannels("t200up", uidNOx_3, 21600, "NOx_3")
+device.NOx_4.createChannels("t200up", uidNOx_4, 21600, "NOx_4") 
+// NOx_5 still to configure (rack ICAD)
+device.NOx_6.createChannels("thermo42i", uidNOx_6, 21600, "NOx_6")
+
+// CO
+device.CO_1.createChannels("al5002", uidCO_1, 21600, "CO_1")
+device.CO_2.createChannels("al5002", uidCO_2, 21600, "CO_2")
+//CO_3 still to configure
+device.CO_4.createChannels("t300u", uidCO_4, 21600, "CO_4")
+
+//SO2
+device.SO2_1.createChannels("thermo43i", uidSO2_1, 21600, "SO2_1")
+device.SO2_2.createChannels("thermo450i", uidSO2_2, 21600, "SO2_2")
+device.SO2_3.createChannels("t100u", uidSO2_3, 21600, "SO2_3")
+device.SO2_4.createChannels("t101", uidSO2_4, 21600, "SO2_4")
+device.SO2_5.createChannels("thermo43i",uidSO2_5,21600, "SO2_5")
+
+// start polling
+time 12
+  beginseq(pollAll)
+  beginseq(saveSwitches)
+
+// start logging at nearest whole minute
+time 13
+
+if(FormatDateTime("%S",SysTime()) == "00")
+   
+  beginseq(logging)
+   
+else
+
+   goto 13
+   
+endif
+

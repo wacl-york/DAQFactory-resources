@@ -1,0 +1,912 @@
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Page.timeSeriesO3.X306_Y51.QuickSequence_0
+
+beginseq(O3_CAL_autocal)
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Page.timeSeriesO3.X419_Y51.QuickSequence_0
+
+endseq(O3_CAL_autocal)
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Page.timeSeriesO3.X763_Y48.QuickSequence_0
+
+if(sequence.O3_CAL_autocal.Running)
+   system.MessageBox("Autocal Running, please wait for this to finish before sending more commands to the calibrator")
+else
+//device.o3_cal.Write("set o3 conc"+" "+o3_autocal_custom_level+chr(13),13)
+endif
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.O3_2B_Sequence, Priority: 5 - Acquisition
+
+while (1)
+time 2
+   
+try
+      private string datain101 = device.O3_2B.ReadUntil(13)
+      datain101 = parse(datain101, 2, ",")
+      O3_2B_GUEST.AddValue(strToDouble(datain101[0]))
+      
+   catch()
+     //    ? strLastError
+      delay(1)
+      endcatch
+ 
+endwhile
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.O3_49C_SERIAL, Priority: 5 - Acquisition
+
+time 5
+
+   try
+      private string datain60 = device.O3_OLD.Poll(chr(177)+"o3"+ chr(13),13)
+      datain60 = mid(datain60,3,13)
+      O3_OLD_channel.AddValue(strToDouble(datain60[0]))
+   catch()
+    //  so2.AddValue(error/0)
+   endcatch
+goto 0
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.O3_Autocal, Priority: 5 - Acquisition
+
+time 0
+device.O3_CAL.Write(("thermo49i",uidO3_CAL,"")+"set o3 conc"+" "+500+chr(13),13)
+
+time 900
+device.O3_CAL.Write(("thermo49i",uidO3_CAL,"")+"set o3 conc"+" "+0+chr(13),13)
+
+time 1800
+time 900
+device.O3_CAL.Write(("thermo49i",uidO3_CAL,"")+"set o3 conc"+" "+50+chr(13),13)
+
+time 2700
+//time 1800
+device.O3_CAL.Write(("thermo49i",uidO3_CAL,"")+"set o3 conc"+" "+100+chr(13),13)
+
+time 3600
+//time 2700
+device.O3_CAL.Write(("thermo49i",uidO3_CAL,"")+"set o3 conc"+" "+150+chr(13),13)
+
+
+time 4500
+//time 3600
+device.O3_CAL.Write(("thermo49i",uidO3_CAL,"")+"set o3 conc"+" "+200+chr(13),13)
+
+
+time 5400
+//time 4500
+device.O3_CAL.Write(("thermo49i",uidO3_CAL,"")+"set o3 conc"+" "+75+chr(13),13)
+
+
+time 6300
+//time 5400
+device.O3_CAL.Write(("thermo49i",uidO3_CAL,"")+"set o3 conc"+" "+125+chr(13),13)
+
+
+time 7200
+//time 6300
+device.O3_CAL.Write(("thermo49i",uidO3_CAL,"")+"set o3 conc"+" "+0+chr(13),13)
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.O3_CAL_autocal, Priority: 5 - Acquisition
+
+private o3_levels = {500, 0, 50, 100, 150, 200, 75, 125, 0}
+
+for(private i = 0, i < numRows(o3_levels), i++)
+  // o3_autocal_progress = i+1
+   o3_autocal_status = "O3 concentration: "+o3_levels[i]+"
+   
+      device.o3_cal.Write("set o3 conc"+" "+o3_levels[i]+chr(13),13)
+   delay(900)
+endfor
+
+o3_autocal_status = "not calibrating"
+o3_autocal_progress = 0
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.SO2_THERMO_SERIAL, Priority: 5 - Acquisition
+
+time 0
+time 5
+
+   try
+      private string datain60 = device.SO2_OLD.Poll(chr(171)+"so2"+ chr(13),13)
+      datain60 = mid(datain60,3,13)
+      SO2_OLD_channel.AddValue(strToDouble(datain60[0]))
+   catch()
+    //  so2.AddValue(error/0)
+   endcatch
+goto 0
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.classSwitchState, Priority: 5 - Acquisition
+
+class switchState
+   
+   local string switchChannels
+   local switchCurrentState
+   local n
+   local string transient settingsPath = "C:\users\cozi_user\desktop\coziswitches.json"
+   
+   function OnCreate()
+      
+      switchChannels = channel.ListAll("switch")
+      
+      n = numRows(switchChannels)
+      
+      switchCurrentState = Fill(0, n)
+      
+      for(private i = 0, i < n, i++)
+         switchCurrentState[i] = evaluate(switchChannels[i]+"[0]")
+      endfor
+      
+   endfunction
+   
+   function saveSettings()
+      private handle = file.Open(settingsPath,0,1,0,1)      
+      file.Write(handle, toJson())
+      file.Close(handle)
+   endfunction
+   
+   function persistSwitchState() // this adds the current value to the switch channel again. Used to make the switch state log alongside everything else
+      for(private i = 0, i < numRows(switchChannels), i++)
+         
+         execute(switchChannels[i]+".addValue("+switchCurrentState[i]+")")
+         
+      endfor
+   endfunction
+   
+   
+endclass
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.createO3_13, Priority: 5 - Acquisition
+
+private string O32B_messages = {"O3","TEMP","PRESS","FLOW"}
+for(private i = 0, i < numRows(O32B_messages), i++)
+   private string newName = "O32B_"+uidO3_13+"_"+O32B_messages[i]
+   channel.Add(newName,"test", 1, "A to D", 0,0,0,"","O3_13")
+   execute(newName+".HistoryLength = 36000")
+endfor
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.createO3_2B_GUEST, Priority: 5 - Acquisition
+
+private string O32B_messages = {"O3","TEMP","PRESS","FLOW"}
+for(private i = 0, i < numRows(O32B_messages), i++)
+   private string newName = "O32B_"+uidO3_2B_GUEST+"_"+O32B_messages[i]
+   channel.Add(newName,"test", 1, "A to D", 0,0,0,"","O3_2B_GUEST")
+   execute(newName+".HistoryLength = 36000")
+endfor
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.createO3_7, Priority: 5 - Acquisition
+
+private string O32B_messages = {"O3","TEMP","PRESS","FLOW"}
+for(private i = 0, i < numRows(O32B_messages), i++)
+   private string newName = "O32B_"+uidO3_7+"_"+O32B_messages[i]
+   channel.Add(newName,"test", 1, "A to D", 0,0,0,"","O3_7")
+   execute(newName+".HistoryLength = 36000")
+endfor
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.init, Priority: 5 - Acquisition
+
+time 0
+endseq(pollAll)
+endseq(saveSwitches)
+endseq(logging)
+
+// wait 10 seconds to let any running poll sequences stop
+time 10
+channel.ClearAll()
+classSwitchState()
+
+
+
+time 11
+
+// instrument friendlyNames
+private string friendlyO3 = {"O3_1","O3_2","O3_3","O3_4","O3_5","O3_6","O3_7","O3_8","O3_9","O3_10","O3_11","O3_12","O3_13","O3_CAL","O3_2BCAL", "O3_2B_GUEST","O3_guest"}
+private string friendlyNOx = {"NO_1","NO2_1","NO2_2","NO2_3","NOx_1","NOx_2","NOx_3","NOx_4","NOx_6","NOx_CAL"}
+private string friendlyCO = {"CO_1","CO_2","CO_3","CO_4"}
+private string friendlySO2 = {"SO2_1","SO2_2","SO2_3","SO2_4","SO2_5"}
+global string friendlyNames = Concat(friendlyO3,Concat(friendlyNOx,Concat(friendlyCO,friendlySO2)))
+
+// instrument switchChannels
+
+private loadFail = 0
+
+try
+   private handle = file.open("c:\users\cozi_user\desktop\coziswitches.json",1,0,0,0)
+   private string dataIn = file.read(handle,file.getLength(handle))
+   file.close(handle)
+   global ss = fromJson(dataIn)
+catch() // if the settings can't be loaded, set all switches to zero
+   loadFail = 1
+   for(private i = 0, i < numRows(friendlyNames), i++)
+   
+      private string enableName = "switch_enable_"+friendlyNames[i]
+      private string manifoldName = "switch_manifold_"+friendlyNames[i]
+
+      channel.Add(enableName, "test", 99, "D to A", i,0,0,"","switch") // need different device/channel numbers otherwise all channels are affected by all switches
+      channel.Add(manifoldName, "test", 100, "D to A", i,0,0,"","switch")
+      execute(enableName+".AddValue(0)")
+      execute(manifoldName+".AddValue(0)")
+   endfor
+endcatch
+
+if(loadFail == 0) // if the settings can be loaded, set the initial channel value to them.
+   for(private i = 0, i < numRows(friendlyNames), i++)
+   
+      private string enableName = "switch_enable_"+friendlyNames[i]
+      private string manifoldName = "switch_manifold_"+friendlyNames[i]
+      private enableLoad = 0
+      private manifoldLoad = 0
+      
+      channel.Add(enableName, "test", 99, "D to A", i,0,0,"","switch") // need different device/channel numbers otherwise all channels are affected by all switches
+      channel.Add(manifoldName, "test", 100, "D to A", i,0,0,"","switch")
+      
+      for(private j = 0, j < numRows(ss.switchChannels), j++)
+         if(enableName == ss.switchChannels[j])
+            execute(enableName+".AddValue("+ss.switchCurrentState[j]+")")
+            enableLoad = 1
+         endif
+         
+         if(manifoldName == ss.switchChannels[j])
+            execute(manifoldName+".AddValue("+ss.switchCurrentState[j]+")")
+            manifoldLoad = 1
+         endif
+      endfor
+      
+      if(enableLoad == 0)
+         execute(enableName+".AddValue(0)")
+      endif
+      
+      if(manifoldLoad == 0)
+         execute(manifoldName+".AddValue(0)")
+      endif
+      
+   endfor
+endif
+
+// instrument ids
+
+global string uidO3_1  = "0536414593"
+global string uidO3_2  = "1008241388"
+global string uidO3_3  = "708621224"
+global string uidO3_4  = "730525419"
+global string uidO3_5  = "1008241369"
+global string uidO3_6  = ""
+global string uidO3_7  = "312DB"
+global string uidO3_8  = "CM10410410079"
+global string uidO3_9  = "1152780002"
+global string uidO3_10 = "1152780003"
+global string uidO3_11 = "1180160010"
+global string uidO3_12 = "1433963617"
+global string uidO3_13 = "1752DB"
+global string uidO3_CAL = "703820527"
+global string uidO3_2BCAL = "2B_CAL"
+global string uidO3_guest = "49_guest"
+global string uidO3_2B_GUEST = "2B_guest"
+
+global string uidNO2_1 = "021732"
+global string uidNO2_2 = "022838"
+global string uidNO2_3 = "021902"
+
+global string uidNOx_1 = "023828"
+global string uidNOx_2 = "022079"
+global string uidNOx_3 = "021842"
+global string uidNOx_4 = "023312"
+global string uidNOx_6 = "1433963619"
+global string uidNOx_CAL = ""
+
+global string uidNO_1 = "42CTL60720328"
+
+global string uidCO_1 = "0059"
+global string uidCO_2 = "154"
+global string uidCO_3 = ""
+global string uidCO_4 = "025583"
+
+global string uidSO2_1 = "1118248674"
+global string uidSO2_2 = "1161690004"
+global string uidSO2_3 = "022130"
+global string uidSO2_4 = "022639"
+global string uidSO2_5 = "43CTL64558352"
+
+//file path
+global string fpRoot = "C:/Users/COZI_USER/documents/COZI_DATA/"
+global string fp = fpRoot+"cozi_all_data_"
+
+
+// graph controls
+global scaleNO  = 20
+global scaleNO2  = 20
+global scaleNOx  = 40
+global scaleCO = 1
+global scaleSO2 = 20
+global scaleO3 = 600
+global scaleXCO = 36000
+global scaleXNOx = 36000
+global scaleXSO2 = 36000
+global scaleXO3 = 36000
+scaleXCore = 36000
+
+// O3 Autocal
+
+global string o3_autocal_status = "not calibrating"
+global o3_autocal_progress = 0
+global o3_autocal_custom_level = 0
+
+//setup instruments
+// one day it might be sensible to create an array of instrument type, uid, history and group (friendly name) and just loop this bit
+
+// O3
+device.O3_1.createChannels("thermo49i", uidO3_1, 21600, "O3_1")
+device.O3_2.createChannels("thermo49i", uidO3_2, 21600, "O3_2")
+device.O3_3.createChannels("thermo49i", uidO3_3, 21600, "O3_3")
+device.O3_4.createChannels("thermo49i", uidO3_4, 21600, "O3_4")
+device.O3_5.createChannels("thermo49i", uidO3_5, 21600, "O3_5")
+// O3_6 still to configure
+beginseq(createO3_7) //should add this code to the wacl_cozi.dpp at some point 
+device.O3_8.createChannels("thermo49i", uidO3_8, 21600, "O3_8")
+device.O3_9.createChannels("thermo49i", uidO3_9, 21600, "O3_9")
+device.O3_10.createChannels("thermo49i", uidO3_10, 21600, "O3_10")
+device.O3_11.createChannels("thermo49i", uidO3_11, 21600, "O3_11")
+device.O3_12.createChannels("thermo49i", uidO3_12, 21600, "O3_12")
+beginseq(createO3_13)
+beginseq(createO3_2B_GUEST)
+device.O3_CAL.createChannels("thermo49i", uidO3_CAL, 21600, "O3_CAL")
+device.O3_guest.createChannels("thermo49i", uidO3_guest, 21600, "O3_guest")
+
+// NO
+device.NO_1.createChannels("thermo42C", uidNO_1, 21600, "NO_1")
+
+// NO2
+device.NO2_1.createChannels("t500u", uidNO2_1, 21600, "NO2_1")
+device.NO2_2.createChannels("t500u", uidNO2_2, 21600, "NO2_2")
+device.NO2_3.createChannels("t500u", uidNO2_3, 21600, "NO2_3")
+
+// NOx
+device.NOx_1.createChannels("t200up", uidNOx_1, 21600, "NOx_1")
+device.NOx_2.createChannels("t200up", uidNOx_2, 21600, "NOx_2")
+device.NOx_3.createChannels("t200up", uidNOx_3, 21600, "NOx_3")
+device.NOx_4.createChannels("t200up", uidNOx_4, 21600, "NOx_4") 
+// NOx_5 still to configure (rack ICAD)
+device.NOx_6.createChannels("thermo42i", uidNOx_6, 21600, "NOx_6")
+
+// CO
+device.CO_1.createChannels("al5002", uidCO_1, 21600, "CO_1")
+device.CO_2.createChannels("al5002", uidCO_2, 21600, "CO_2")
+//CO_3 still to configure
+device.CO_4.createChannels("t300u", uidCO_4, 21600, "CO_4")
+
+//SO2
+device.SO2_1.createChannels("thermo43i", uidSO2_1, 21600, "SO2_1")
+device.SO2_2.createChannels("thermo450i", uidSO2_2, 21600, "SO2_2")
+device.SO2_3.createChannels("t100u", uidSO2_3, 21600, "SO2_3")
+device.SO2_4.createChannels("t101", uidSO2_4, 21600, "SO2_4")
+device.SO2_5.createChannels("thermo43i",uidSO2_5,21600, "SO2_5")
+
+// start polling
+time 12
+  beginseq(pollAll)
+  beginseq(saveSwitches)
+
+// start logging at nearest whole minute
+time 13
+
+if(FormatDateTime("%S",SysTime()) == "00")
+   
+  beginseq(logging)
+   
+else
+
+   goto 13
+   
+endif
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.logging, Priority: 5 - Acquisition
+
+// On first setup
+// Make an empty loggingSet in the UI called `allChannels`
+// Set to fixed interval and define averaging period
+
+private string allChannelNames = channel.ListAll()
+
+for(private i = 0, i < numRows(allChannelNames), i++)
+   logging.allChannels.AddChannel(allChannelNames[i])
+endfor
+
+logging.allChannels.strLoggingMethod = "ASCII Delimited"
+logging.allChannels.strDelimiter = ","
+logging.allChannels.strFileName = fp+FormatDateTime("%y%m%d_%H%M%S.csv",SysTime())
+
+logging.allChannels.Start()
+
+while(1)
+   
+   if(FormatDateTime("%M%S",SysTime()) == "5959")
+      logging.allChannels.strFileName = fp+FormatDateTime("%y%m%d_%H%M%S.csv",SysTime())
+      delay(1)
+   endif
+   
+endwhile
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.pollAll, Priority: 5 - Acquisition
+
+time 0
+   
+   
+   //O3
+   if(switch_enable_O3_1[0] == 1)
+      beginseq(poll_O3_1)
+   endif
+   
+   if(switch_enable_O3_2[0] == 1)
+      beginseq(poll_O3_2)
+   endif
+   
+   if(switch_enable_O3_3[0] == 1)
+      beginseq(poll_O3_3)
+   endif
+   
+   if(switch_enable_O3_4[0] == 1)
+      beginseq(poll_O3_4)
+   endif
+   
+   if(switch_enable_O3_5[0] == 1)
+      beginseq(poll_O3_5)
+   endif
+   
+   if(switch_enable_O3_6[0] == 1)
+     beginseq(poll_O3_6)
+   endif
+   
+   if(switch_enable_O3_7[0] == 1)
+      beginseq(poll_O3_7)
+   endif
+   
+   if(switch_enable_O3_8[0] == 1)
+      beginseq(poll_O3_8)
+   endif
+   
+   if(switch_enable_O3_9[0] == 1)
+      beginseq(poll_O3_9) 
+   endif
+   
+   if(switch_enable_O3_10[0] == 1)
+      beginseq(poll_O3_10)
+   endif
+   
+   if(switch_enable_O3_11[0] == 1)
+      beginseq(poll_O3_11)
+   endif
+   
+   if(switch_enable_O3_12[0] == 1)
+      //
+   endif
+   
+   if(switch_enable_O3_13[0] == 1)
+      beginseq(poll_O3_13)
+   endif
+
+   
+   if(switch_enable_O3_CAL[0] == 1)
+      beginseq(poll_O3_CAL)
+   endif
+   
+   if(switch_enable_O3_guest[0] == 1)
+      beginseq(poll_O3_guest)
+   endif
+   
+   
+   if(switch_enable_O3_2B_GUEST[0] == 1)
+      beginseq(poll_O3_2B_GUEST)
+   endif
+   
+   //NO
+   if(switch_enable_NO_1[0] == 1)
+      beginseq(poll_NO_1)
+   endif
+   
+   //NO2
+   if(switch_enable_NO2_1[0] == 1)
+      beginseq(poll_NO2_1)
+   endif
+   
+   if(switch_enable_NO2_2[0] == 1)
+      beginseq(poll_NO2_2)
+     // beginseq(poll_CAPS_Sequence)
+     
+   endif
+   
+   if(switch_enable_NO2_3[0] == 1)
+      beginseq(poll_NO2_3)       
+   endif
+
+   
+   //NOx
+   
+   if(switch_enable_NOx_1[0] == 1)
+      beginseq(poll_NOx_1)
+   endif
+   
+   if(switch_enable_NOx_2[0] == 1)
+      beginseq(poll_NOx_2)
+   endif
+   
+   if(switch_enable_NOx_3[0] == 1)
+      beginseq(poll_NOx_3)
+   endif
+   
+   if(switch_enable_NOx_4[0] == 1)
+      beginseq(poll_NOx_4)
+   endif
+   
+      
+   //CO
+   if(switch_enable_CO_1[0] == 1)
+      beginseq(poll_CO_1)
+   endif
+   
+   if(switch_enable_CO_2[0] == 1)
+      beginseq(poll_CO_2)
+   endif
+   
+   if(switch_enable_CO_2[0] == 1)
+      beginseq(poll_CO_3)
+   endif
+   
+   if(switch_enable_CO_4[0] == 1)
+      beginseq(poll_CO_4)
+   endif
+   
+   //SO2
+   if(switch_enable_SO2_1[0] == 1)
+      beginseq(poll_SO2_1)
+   endif
+   
+   if(switch_enable_SO2_2[0] == 1)
+      beginseq(poll_SO2_2)
+   endif   
+   
+   if(switch_enable_SO2_3[0] == 1)
+      beginseq(poll_SO2_3)
+   endif   
+   
+   if(switch_enable_SO2_4[0] == 1)
+       beginseq(poll_SO2_4)
+   endif   
+   
+   if(switch_enable_SO2_5[0] == 1)
+      beginseq(poll_SO2_5)
+   endif   
+   
+time 9
+   saveSwitches()
+   
+   // tidy the autocal UI if the sequence gets interrupted
+   if(sequence.O3_CAL_autocal.Running() == 0 & compare(o3_autocal_status,"not calibrating") == -1) 
+      o3_autocal_status = "not calibrating"
+      o3_autocal_progress = 0
+   endif
+   
+time 10
+
+   goto 0
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.poll_CO_1, Priority: 5 - Acquisition
+
+time 0
+
+   device.CO_1.getAll("al5002", uidCO_1, "")
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.poll_CO_2, Priority: 5 - Acquisition
+
+time 0
+
+   device.CO_2.getAll("al5002", uidCO_2, "")
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.poll_CO_3, Priority: 5 - Acquisition
+
+time 0
+
+   // to configure
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.poll_CO_4, Priority: 5 - Acquisition
+
+time 0
+
+   device.CO_4.getAll("t300u", uidCO_4, "T ")
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.poll_NO2_1, Priority: 5 - Acquisition
+
+time 0
+
+   device.NO2_1.getAll("t500u",uidNO2_1,"T ")
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.poll_NO2_2, Priority: 5 - Acquisition
+
+time 0
+
+   device.NO2_2.getAll("t500u",uidNO2_2,"T ")
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.poll_NO2_3, Priority: 5 - Acquisition
+
+time 0
+
+   device.NO2_3.getAll("t500u",uidNO2_3,"T ")
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.poll_NO_1, Priority: 5 - Acquisition
+
+time 0
+   device.NO_1.getAll("thermo42C",uidNO_1,chr(142))
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.poll_NOx_1, Priority: 5 - Acquisition
+
+time 0
+
+   device.NOx_1.getAll("t200up",uidNOx_1,"T ")
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.poll_NOx_2, Priority: 5 - Acquisition
+
+time 0
+
+   device.NOx_2.getAll("t200up",uidNOx_2,"T ")
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.poll_NOx_3, Priority: 5 - Acquisition
+
+time 0
+
+   device.NOx_3.getAll("t200up",uidNOx_3,"T ")
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.poll_NOx_4, Priority: 5 - Acquisition
+
+time 0
+
+   device.NOx_4.getAll("t200up",uidNOx_4,"T ")
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.poll_O3_1, Priority: 5 - Acquisition
+
+time 0
+
+   device.O3_1.getAll("thermo49i",uidO3_1,chr(129))
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.poll_O3_10, Priority: 5 - Acquisition
+
+time 0
+
+   device.O3_10.getAll("thermo49i",uidO3_10,"")
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.poll_O3_11, Priority: 5 - Acquisition
+
+time 0
+
+   device.O3_11.getAll("thermo49i",uidO3_11,"")
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.poll_O3_13, Priority: 5 - Acquisition
+
+time 0
+
+   try
+      
+      device.O3_13.Purge()
+      private string O3_13_output = parse(device.O3_13.ReadUntil(13),-1,",")
+      
+      O32B_1752DB_O3.AddValue(strToDouble(O3_13_output[0]))
+      O32B_1752DB_TEMP.AddValue(strToDouble(O3_13_output[1]))
+      O32B_1752DB_PRESS.AddValue(strToDouble(O3_13_output[2]))
+      O32B_1752DB_FLOW.AddValue(strToDouble(O3_13_output[3]))
+   catch()
+      O32B_1752DB_O3.AddValue(1/0)
+      O32B_1752DB_TEMP.AddValue(1/0)
+      O32B_1752DB_PRESS.AddValue(1/0)
+      O32B_1752DB_FLOW.AddValue(1/0) 
+   endcatch
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.poll_O3_2, Priority: 5 - Acquisition
+
+time 0
+
+   device.O3_2.getAll("thermo49i",uidO3_2,"")
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.poll_O3_2B_GUEST, Priority: 5 - Acquisition
+
+time 0
+
+   try
+      device.O3_2B_GUEST.Purge()
+      device.O3_2B_GUEST.Poll("abc",13) // send to keep the comm port awake?! maybe an issue with the brainboxes
+      
+      private string datain = device.O3_2B_GUEST.ReadUntil(13)
+      private string O3_2B_GUEST_output = parse(datain,-1,",")
+
+     O32B_2B_guest_O3.AddValue(strToDouble(O3_2B_GUEST_output[0]))
+      O32B_2B_guest_TEMP.AddValue(strToDouble(O3_2B_GUEST_output[1]))
+      O32B_2B_guest_PRESS.AddValue(strToDouble(O3_2B_GUEST_output[2]))
+      O32B_2B_guest_FLOW.AddValue(strToDouble(O3_2B_GUEST_output[3]))
+   catch()
+      O32B_2B_guest_O3.AddValue(1/0)
+      O32B_2B_guest_TEMP.AddValue(1/0)
+      O32B_2B_guest_PRESS.AddValue(1/0)
+      O32B_2B_guest_FLOW.AddValue(1/0) 
+   endcatch
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.poll_O3_3, Priority: 5 - Acquisition
+
+time 0
+
+   device.O3_3.getAll("thermo49i",uidO3_3,"")
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.poll_O3_4, Priority: 5 - Acquisition
+
+time 0
+
+   device.O3_4.getAll("thermo49i",uidO3_4,"")
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.poll_O3_5, Priority: 5 - Acquisition
+
+time 0
+
+   device.O3_5.getAll("thermo49i",uidO3_5,"")
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.poll_O3_6, Priority: 5 - Acquisition
+
+// to configure
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.poll_O3_7, Priority: 5 - Acquisition
+
+time 0
+
+   try
+      
+      device.O3_7.Purge()
+      private string O3_7_output = parse(device.O3_7.ReadUntil(13),-1,",")
+      
+      O32B_312DB_O3.AddValue(strToDouble(O3_7_output[0]))
+      O32B_312DB_TEMP.AddValue(strToDouble(O3_7_output[1]))
+      O32B_312DB_PRESS.AddValue(strToDouble(O3_7_output[2]))
+      O32B_312DB_FLOW.AddValue(strToDouble(O3_7_output[3]))
+   catch()
+      O32B_312DB_O3.AddValue(1/0)
+      O32B_312DB_TEMP.AddValue(1/0)
+      O32B_312DB_PRESS.AddValue(1/0)
+      O32B_312DB_FLOW.AddValue(1/0) 
+   endcatch
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.poll_O3_8, Priority: 5 - Acquisition
+
+time 0
+
+   device.O3_8.getAll("thermo49i",uidO3_8,"") // maybe third argument should be chr(132)
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.poll_O3_9, Priority: 5 - Acquisition
+
+time 0
+
+   device.O3_9.getAll("thermo49i",uidO3_9,"")
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.poll_O3_Cal, Priority: 5 - Acquisition
+
+time 0
+
+   device.O3_CAL.getAll("thermo49i",uidO3_CAL,"")
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.poll_O3_guest, Priority: 5 - Acquisition
+
+time 0
+
+   device.O3_guest.getAll("thermo49i",uidO3_guest,chr(177))
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.poll_SO2_1, Priority: 5 - Acquisition
+
+time 0
+
+  
+   device.SO2_1.getAll("thermo43i", uidSO2_1, "")
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.poll_SO2_2, Priority: 5 - Acquisition
+
+time 0
+
+   device.SO2_2.getAll("thermo450i", uidSO2_2, "")
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.poll_SO2_3, Priority: 5 - Acquisition
+
+time 0
+
+   device.SO2_3.getAll("t100u", uidSO2_3, "T ")
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.poll_SO2_4, Priority: 5 - Acquisition
+
+time 0
+
+   device.SO2_4.getAll("t101", uidSO2_4, "T ")
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.poll_SO2_5, Priority: 5 - Acquisition
+
+time 0
+
+   device.SO2_5.getAll("thermo43i", uidSO2_5, "")
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.poll_UGGA, Priority: 5 - Acquisition
+
+while (1)
+
+   try
+      private string datain10 = device.UGGA.ReadUntil(13)
+      datain10 = parse(datain10,-1,",")
+      CH4.AddValue(strToDouble(datain10[1]))
+      H2O.AddValue(strToDouble(datain10[3]))
+      CO2.AddValue(strToDouble(datain10[5]))
+catch()
+
+endcatch
+
+endwhile
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.saveSwitches, Priority: 5 - Acquisition
+
+global ss = new(switchState)
+
+ss.saveSettings()
+ss.persistSwitchState()
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.set_o3_coeff, Priority: 5 - Acquisition
+
+time 0
+device.O3_1.Write(chr(129)+"set mode remote"+" "+chr(13),13)
+
+//time 1
+//device.O3_1.Write(chr(129)+"o3 bkg"+" "+chr(13),13)
+
+//time 2
+//device.O3_1.Write(chr(129)+"set o3 bkg -2.0"+""+chr(13),13)
+
+time 3
+device.O3_1.Write(chr(129)+"o3 coef"+""+chr(13),13)
+
+time 4
+device.O3_1.Write(chr(129)+"set o3 coef 1.071"+""+chr(13),13)
+

@@ -1,0 +1,24 @@
+// On first setup
+// Make an empty loggingSet in the UI called `allChannels`
+// Set to fixed interval and define averaging period
+
+private string allChannelNames = channel.ListAll()
+
+for(private i = 0, i < numRows(allChannelNames), i++)
+   logging.allChannels.AddChannel(allChannelNames[i])
+endfor
+
+logging.allChannels.strLoggingMethod = "ASCII Delimited"
+logging.allChannels.strDelimiter = ","
+logging.allChannels.strFileName = fp+FormatDateTime("%y%m%d_%H%M%S.csv",SysTime())
+
+logging.allChannels.Start()
+
+while(1)
+   
+   if(FormatDateTime("%M%S",SysTime()) == "5959")
+      logging.allChannels.strFileName = fp+FormatDateTime("%y%m%d_%H%M%S.csv",SysTime())
+      delay(1)
+   endif
+   
+endwhile

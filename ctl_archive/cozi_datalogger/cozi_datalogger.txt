@@ -1,0 +1,3 @@
+This .ctl is the new version of the data logging system for the COZI lab
+It uses the wacl_cozi protocol for as many instruments as possible to standardise the logging process
+In addition ui switches are used to enable/disable the logging of instruments, which forces the user to also log when an instrument was actually present

@@ -1,0 +1,4 @@
+time 0
+
+   device.O3_1.getAll("thermo49i",uidO3_1,chr(129))
+

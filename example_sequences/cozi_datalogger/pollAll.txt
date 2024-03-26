@@ -1,0 +1,160 @@
+time 0
+   
+   
+   //O3
+   if(switch_enable_O3_1[0] == 1)
+      beginseq(poll_O3_1)
+   endif
+   
+   if(switch_enable_O3_2[0] == 1)
+      beginseq(poll_O3_2)
+   endif
+   
+   if(switch_enable_O3_3[0] == 1)
+      beginseq(poll_O3_3)
+   endif
+   
+   if(switch_enable_O3_4[0] == 1)
+      beginseq(poll_O3_4)
+   endif
+   
+   if(switch_enable_O3_5[0] == 1)
+      beginseq(poll_O3_5)
+   endif
+   
+   if(switch_enable_O3_6[0] == 1)
+     beginseq(poll_O3_6)
+   endif
+   
+   if(switch_enable_O3_7[0] == 1)
+      beginseq(poll_O3_7)
+   endif
+   
+   if(switch_enable_O3_8[0] == 1)
+      beginseq(poll_O3_8)
+   endif
+   
+   if(switch_enable_O3_9[0] == 1)
+      beginseq(poll_O3_9) 
+   endif
+   
+   if(switch_enable_O3_10[0] == 1)
+      beginseq(poll_O3_10)
+   endif
+   
+   if(switch_enable_O3_11[0] == 1)
+      beginseq(poll_O3_11)
+   endif
+   
+   if(switch_enable_O3_12[0] == 1)
+      //
+   endif
+   
+   if(switch_enable_O3_13[0] == 1)
+      beginseq(poll_O3_13)
+   endif
+
+   
+   if(switch_enable_O3_CAL[0] == 1)
+      beginseq(poll_O3_CAL)
+   endif
+   
+   if(switch_enable_O3_guest[0] == 1)
+      beginseq(poll_O3_guest)
+   endif
+   
+   
+   if(switch_enable_O3_2B_GUEST[0] == 1)
+      beginseq(poll_O3_2B_GUEST)
+   endif
+   
+   //NO
+   if(switch_enable_NO_1[0] == 1)
+      beginseq(poll_NO_1)
+   endif
+   
+   //NO2
+   if(switch_enable_NO2_1[0] == 1)
+      beginseq(poll_NO2_1)
+   endif
+   
+   if(switch_enable_NO2_2[0] == 1)
+      beginseq(poll_NO2_2)
+     // beginseq(poll_CAPS_Sequence)
+     
+   endif
+   
+   if(switch_enable_NO2_3[0] == 1)
+      beginseq(poll_NO2_3)       
+   endif
+
+   
+   //NOx
+   
+   if(switch_enable_NOx_1[0] == 1)
+      beginseq(poll_NOx_1)
+   endif
+   
+   if(switch_enable_NOx_2[0] == 1)
+      beginseq(poll_NOx_2)
+   endif
+   
+   if(switch_enable_NOx_3[0] == 1)
+      beginseq(poll_NOx_3)
+   endif
+   
+   if(switch_enable_NOx_4[0] == 1)
+      beginseq(poll_NOx_4)
+   endif
+   
+      
+   //CO
+   if(switch_enable_CO_1[0] == 1)
+      beginseq(poll_CO_1)
+   endif
+   
+   if(switch_enable_CO_2[0] == 1)
+      beginseq(poll_CO_2)
+   endif
+   
+   if(switch_enable_CO_2[0] == 1)
+      beginseq(poll_CO_3)
+   endif
+   
+   if(switch_enable_CO_4[0] == 1)
+      beginseq(poll_CO_4)
+   endif
+   
+   //SO2
+   if(switch_enable_SO2_1[0] == 1)
+      beginseq(poll_SO2_1)
+   endif
+   
+   if(switch_enable_SO2_2[0] == 1)
+      beginseq(poll_SO2_2)
+   endif   
+   
+   if(switch_enable_SO2_3[0] == 1)
+      beginseq(poll_SO2_3)
+   endif   
+   
+   if(switch_enable_SO2_4[0] == 1)
+       beginseq(poll_SO2_4)
+   endif   
+   
+   if(switch_enable_SO2_5[0] == 1)
+      beginseq(poll_SO2_5)
+   endif   
+   
+time 9
+   saveSwitches()
+   
+   // tidy the autocal UI if the sequence gets interrupted
+   if(sequence.O3_CAL_autocal.Running() == 0 & compare(o3_autocal_status,"not calibrating") == -1) 
+      o3_autocal_status = "not calibrating"
+      o3_autocal_progress = 0
+   endif
+   
+time 10
+
+   goto 0
