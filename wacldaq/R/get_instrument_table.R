@@ -27,7 +27,8 @@ get_instrument_table = function(keyName = "cozi_instruments_id",
         name = Katie_simple_name,
         serial = Serial_number,
         ip = IP_Address,
-        port = Port) |>
+        port = Port,
+        measurement = Measurement) |>
       dplyr::filter(dplyr::if_all(dplyr::everything(), ~!is.na(.x))) # only support instruments that have all variables present
 
     the$allInstruments = allInstruments

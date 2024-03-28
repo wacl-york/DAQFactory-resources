@@ -2,4 +2,4 @@
 
 the = new.env(parent = emptyenv())
 
-the$instruments = NULL
+the$allInstruments = NULL
