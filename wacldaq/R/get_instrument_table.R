@@ -35,6 +35,6 @@ get_instrument_table = function(keyName = "cozi_instruments_id",
     the$allInstruments = allInstruments
   }
 
-  allInstruments
+  the$allInstruments
 
 }
