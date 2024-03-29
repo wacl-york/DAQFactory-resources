@@ -28,9 +28,13 @@ get_instrument_table = function(keyName = "cozi_instruments_id",
         ip = IP_Address,
         port = Port,
         measurement = Measurement,
-        type = `Instrument DAQ ID`) |>
-      dplyr::filter(dplyr::if_all(dplyr::everything(), ~!is.na(.x))) |>  # only support instruments that have all variables present
-      dplyr::mutate(uidName = paste0("uid", name))
+        type = `Instrument DAQ ID`,
+        command_prefix) |>
+      dplyr::filter(dplyr::if_all(-command_prefix, ~!is.na(.x))) |>  # only support instruments that have all variables present (commnad_prefix can be NA)
+      dplyr::mutate(uidName = paste0("uid", name),
+                    command_prefix = ifelse(is.na(command_prefix),
+                                            '""',
+                                            paste0('"',stringr::str_trim(command_prefix)," ",'"')))
 
     the$allInstruments = allInstruments
   }
