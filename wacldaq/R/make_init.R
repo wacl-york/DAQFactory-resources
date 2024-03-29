@@ -3,10 +3,7 @@
 #' Creates the daq sequence "init". \cr
 #' This sequence sets up global variables for graphing and channels for logging via the wacl_cozi.ddp
 #'
-#' @param instrumentNames vector of instrument names matching those in the table defined by \code{get_instrument_table()}
-#' @param fpRoot path to the folder in which to save data
-#' @param filePrefix name to prefix to file ahead of the start date.
-#' @param historyLength numeric default 21600 - DAQFactory \code{channelName.HistoryLength} - how long (in seconds) should the channel keep in memory
+#' @inheritParams make_sequences
 #'
 #' @author W. S. Drysdale
 #'

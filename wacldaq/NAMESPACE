@@ -3,3 +3,6 @@
 export(get_instrument_table)
 export(graph_scale_defaults)
 export(make_init)
+export(make_logging)
+export(make_pollAll)
+export(make_sequences)
