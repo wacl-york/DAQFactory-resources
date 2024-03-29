@@ -39,8 +39,8 @@ make_init = function(instrumentNames,
     append(paste0("global string ",instruments$uidName,' = "',instruments$serial,'"')) |>
     append(c("",
              "// file path")) |>
-    append(paste0("global string fpRoot = ", fpRoot)) |>
-    append(paste0("global string filePrefix = ", filePrefix)) |>
+    append(paste0('global string fpRoot = "', fpRoot,'"')) |>
+    append(paste0('global string filePrefix = "', filePrefix,'"')) |>
     append(c("",
              "// graph controls")) |>
     append(paste0("global scale",graphScales$measurement," = ",graphScales$yscale)) |>
