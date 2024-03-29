@@ -4,9 +4,21 @@
 \alias{make_init}
 \title{Make Init}
 \usage{
-make_init(instruments)
+make_init(instrumentNames, fpRoot, filePrefix, historyLength = 21600)
+}
+\arguments{
+\item{instrumentNames}{vector of instrument names matching those in the table defined by \code{get_instrument_table()}}
+
+\item{fpRoot}{path to the folder in which to save data}
+
+\item{filePrefix}{name to prefix to file ahead of the start date.}
+
+\item{historyLength}{numeric default 21600 - DAQFactory \code{channelName.HistoryLength} - how long (in seconds) should the channel keep in memory}
 }
 \description{
-Creates the daq sequence "init",
-sdsads
+Creates the daq sequence "init". \cr
+This sequence sets up global variables for graphing and channels for logging via the wacl_cozi.ddp
+}
+\author{
+W. S. Drysdale
 }

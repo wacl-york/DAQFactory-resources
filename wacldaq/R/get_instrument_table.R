@@ -1,8 +1,7 @@
 #' Get Instrument Table
 #'
-#' Returns a tibble containing name, ip, port and serial for all the instruments
-#' support by the logger
-#' Right now this downloads the cozi_instruments spreadsheet from google drive.
+#' Returns a tibble containing name, ip, port, type and serial for all the instruments supported by the logger
+#' Right now this downloads the cozi_instruments spreadsheet from Google Drive.
 #' The user needs have "cozi_instruments_id" as the sheets_id in {{keyring}} such that
 #' \code{keyring::key_get("cozi_instruments_id")} returns the sheet id.
 #' This will certainly change when the instrument data finds a better home
@@ -28,8 +27,10 @@ get_instrument_table = function(keyName = "cozi_instruments_id",
         serial = Serial_number,
         ip = IP_Address,
         port = Port,
-        measurement = Measurement) |>
-      dplyr::filter(dplyr::if_all(dplyr::everything(), ~!is.na(.x))) # only support instruments that have all variables present
+        measurement = Measurement,
+        type = `Instrument DAQ ID`) |>
+      dplyr::filter(dplyr::if_all(dplyr::everything(), ~!is.na(.x))) |>  # only support instruments that have all variables present
+      dplyr::mutate(uidName = paste0("uid", name))
 
     the$allInstruments = allInstruments
   }
