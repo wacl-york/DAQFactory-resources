@@ -13,7 +13,7 @@ make_poll = function(instrumentNames){
   instruments = get_instrument_table() |>
     dplyr::filter(name %in% instrumentNames)
 
-  poll = paste0("device.",instruments$name,".getAll(",instruments$type,",",instruments$uidName,",",instruments$command_prefix,")") |>
+  poll = paste0("device.",instruments$name,'.getAll("',instruments$type,'",',instruments$uidName,",",instruments$command_prefix,")") |>
     as.list()
 
   names(poll) = paste0("poll_", instruments$name)
