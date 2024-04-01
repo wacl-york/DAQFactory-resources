@@ -9,7 +9,7 @@
 graph_scale_defaults = function(){
 
   dplyr::tribble(
-    ~measurement, ~xscale,~yscale,
+    ~measurement, ~yscale,~xscale,
     "O3", 60, 36000,
     "CO", 1, 36000,
     "NO", 20, 36000,
