@@ -62,6 +62,7 @@ make_init = function(instrumentNames,
     append(c("",
              "// start logging at nearest minute",
              'waituntil(floor(SysTime() / 60) * 60 + 60)',
+             "beginseq(pollAll)",
              "beginseq(logging)"))
 
 
