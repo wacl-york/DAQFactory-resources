@@ -192,6 +192,13 @@ function parseResponse(string response, string inst, messageIndex)
 	  private string allResponses = responseFromMessage(inst)
 	  private string expectedResponse = allResponses[messageIndex]+"="
 	  private check = Find(response,expectedResponse,0) != -1
+	  
+	  // t200up are not consistent in what the O3 FLOW response is
+	  // Depending on the instrument its either "O3GEN FL" or "OZONE FL" - YLSTI
+	  if(!check & messageIndex == 5)
+		  private check = Find(response,"OZONE FL",0) != -1
+	  endif
+	  
 	  if(check)
 		responseParsed = strToDouble(parse(parse(response, 1, "="), 0, " "))
 	  else
