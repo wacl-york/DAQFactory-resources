@@ -1,0 +1,620 @@
+class commDevice
+   local PortOb
+   local DeviceOb
+   
+   // create ports   
+   // creates a device using the NULL protocol
+   function createNullDevice()
+      if (IsEmpty(PortOb))
+         throw("PortOb is empty, first create TCP or serial port")
+      endif
+      DeviceOb = new(CCommDevice)
+      DeviceOb.portObject = PortOb
+      DeviceOb.protocolName = ""
+   endfunction
+   
+   function createTCPPort(string IPAddress, portNum, timeout)
+      PortOb = new(CCommEthernet)
+      PortOb.address = IPAddress
+      PortOb.port = portNum
+      PortOb.timeout = timeout
+      InitComm()
+   endfunction
+   
+   function initTCP(string IPAddress, portNum, timeout)
+      createTCPPort(IPAddress, portNum, timeout)
+      createNullDevice()
+   endfunction
+      
+   
+   // Creates a serial port
+   function createSerialPort(portNum, baud, bytesize, parity, stopbits, timeout)
+      PortOb = new(CCommSerial)
+      PortOb.Port = portNum
+      PortOb.Baud = baud
+      PortOb.ByteSize = bytesize
+      PortOb.Parity = parity
+      PortOb.StopBits = stopbits
+      PortOb.Timeout = timeout
+      InitComm()
+   endfunction
+
+   // initialised a serial port using the NULL Protocol
+   function initSerial(portNum, baud, bytesize, parity, stopbits, timeout)
+      createSerialPort(portNum, baud, bytesize, parity, stopbits, timeout)
+      createNullDevice()
+   endfunction
+   
+   // comms generics
+   function InitComm()
+      PortOb.InitComm()
+   endfunction
+   
+   function Purge()
+      PortOb.Purge()
+   endfunction
+   
+   function readUntil(until)
+      return(PortOb.ReadUntil(until))
+   endfunction
+   
+   function Write(string out)
+      PortOb.Write(out)
+   endfunction
+   
+   function Read(amt)
+      return(PortOb.Read(amt))
+   endfunction
+   
+   function Monitor()
+      PortOb.Monitor()
+   endfunction
+   
+   function LockPort()
+      PortOb.LockPort()
+   endfunction
+   
+   function UnlockPort()
+      PortOb.UnlockPort()
+   endfunction
+   
+   function Poll(string out, until)
+      // this function will poll the port with given string and read
+      // the response until the given character.  Returns NULL (empty)
+      // if there is an error
+
+      if (argc < 2)
+         throw("Invalid number of parameters")
+      endif
+      private string in
+      try
+         // lock the port
+         if (!LockPort())
+            throw("Unable to lock port")
+         endif
+         // clear anything pending
+         Purge()
+         // output our string
+         Write(out)
+         // and read until the eol:
+         in = ReadUntil(until) 
+         // release the port
+         UnlockPort()
+         // and return the response
+         return(in)
+      catch()
+         // error occured
+         UnlockPort()
+         throw()
+      endcatch
+      // return NULL to indicate error.  This should never happen
+      // because of the throw() statement above
+      return(NULL)
+   endfunction
+endclass
+
+class instrument parent commDevice
+   local string paramNames
+   local string serialNumber
+   local string channelNames
+   local string instrumentName // use for channel grouping
+   local string instrumentType
+   local historyLength = 3600
+   
+   // instrument specifiers
+   function setSerialNumber(string strIn)
+      serialNumber = strIn
+   endfunction
+   
+   function setHistoryLength(in)
+      historyLength = in
+   endfunction
+   
+   function setInstrumentName(string strIn)
+      instrumentName = strIn
+   endfunction
+   
+   // Set the instrumnet type but also trigger the creation of the paramNames
+   // checks that the instrument is listed in listInstrumentTypes() as a double check that the instrument has been implemented
+   function setInstrumentType(string strIn)
+      private instrumentExists = 0
+      private string it = listInstrumentTypes()
+      for(private i = 0, i < numRows(it), i++)
+         if(strIn == it[i])
+            instrumentExists = 1
+         endif
+      endfor
+      
+      if(instrumentExists == 0)
+         throw("Instrument is not registed in listInstrumnetTypes()")
+      endif
+      
+      instrumentType = strIn
+      paramNames = getParamNames()
+   endfunction
+   
+   // returns a list of instrument types supported by this class
+   function listInstrumentTypes()
+      return({"t101", "t100u", "al5002", "t200up", "thermo49i", "thermo43i", "aqguard", "aqguardbins", "t300u", "t500u", "thermo450i", "thermo42C", "thermo42i", "ht8700e", "icad200de"})
+   endfunction
+   
+   // contains all the parameter names associated with each instrument
+   // if the instrument needs to be polled per argument, these should be the commands to do so e.g Teledyne/Thermo
+   // if the instrument is sent one command and returns many fields e.g ICAD, then these should name the fields returned
+   // these will then have spaces and '?' characters stripped and will be used in channel name creation
+   function getParamNames()
+      switch
+         case(instrumentType == "t101")
+            return({"SO2", "SAMPFLOW", "SAMPPRESS", "PMTDET","UVDET","LAMPRATIO", "SO2SLOPE", "SO2OFFSET", "H2S","H2SSLOPE","H2SOFFSET", "HVPS", "RCELLTEMP", "BOXTEMP","PMTTEMP", "CONVTEMP"})
+            
+         case(instrumentType == "t100u")	
+            return({"SO2", "SAMPFLOW", "SAMPPRESS", "PMTDET","UVDET","LAMPRATIO", "SLOPE", "OFFSET", "HVPS", "RCELLTEMP", "BOXTEMP","PMTTEMP"})
+      
+         case(instrumentType == "al5002")
+            return({"CONC?", "SIG?", "ZERO?", "SENS?","TEMP? M","TEMP? L","TEMP? C","PRESS? L", "PRESS? C", "PRESS? F", "FLOW? M", "FLOW? L"})
+      
+         case(instrumentType  == "t200up")
+            return({"NO", "NO2", "NOX", "SAMPPRESS", "SAMPFLOW","OZONEFLOW", "HVPS", "RCELLTEMP", "BOXTEMP", "PMTTEMP", "CONVTEMP", "RCELLPRESS", "NOSLOPE", "NOOFFSET", "NOXSLOPE", "NOXOFFSET"})
+
+         case(instrumentType == "thermo49i")
+            return({"O3", "BENCH TEMP", "FLOW A", "FLOW B", "LAMP TEMP", "PRES"})
+      
+         case(instrumentType == "thermo43i")
+            return({"SO2", "gas mode", "conv temp", "flow", "internal temp", "pmt voltage", "pres", "react temp"})
+            
+         case(instrumentType == "aqguard")
+            return({"0", "1", "2", "3", "4", "5", "6", "23", "24", "26", "27", "35", "36", "40", "41", "47", "50", "51", "60", "61", "62", "63", "64", "65"})
+      
+         case(instrumentType == "aqguardBins")
+            return({"110", "111", "112", "113", "114", "115", "116", "117", "118", "119", "120", "121", "123", "124", "125", "126", "127", "128", "129", "130", "131", "132", "133", "134", "135", "136", "137", "138", "139", "140", "141", "142", "143", "144", "145", "146", "147", "148", "149", "150", "151", "152", "153", "154", "155", "156", "157", "158", "159", "160", "161", "162", "163", "164", "165", "166", "167", "168", "169", "170", "171", "172", "173"})
+            
+         case(instrumentType == "t300u")
+            return({"CO", "COMEAS","COREF", "MRRATIO", "SAMPPRESS", "SAMPFLOW", "BENCHTEMP","WHEELTEMP","OVENTEMP","COSLOPE", "COOFFSET","STABILITY"})
+            
+         case(instrumentType == "t500u")
+            return({"NO2", "PHASE", "SAMPPRESS","SAMPTEMP","BOXTEMP","SLOPE","OFFSET","STABILITY","AUTOREF","OVENTEMP"})
+            
+         case(instrumentType == "thermo450i")
+            return({"SO2", "H2S", "CONV TEMP", "FLOW","INTERNAL TEMP", "PMT VOLTAGE", "PRES", "REACT TEMP"})
+
+         case(instrumentType == "thermo42C")
+            return({"NO","PRES","SAMPLE FLOW","OZONATOR FLOW","REACT TEMP","PMT TEMP","PMT VOLTAGE","CONV TEMP"})
+            
+         case(instrumentType == "thermo42i")
+            return({"NO","NO2","NOX","PRES","SAMPLE FLOW","OZONATOR FLOW","REACT TEMP","PMT TEMP","PMT VOLTAGE","CONV TEMP"})
+         
+         case(instrumentType == "ht8700e")
+            private string paramNames1 = {"dataPacket","nh3Mix","nh3Mass","intHum","intTemp","ambTemp","ambPress","oss","peakPos","laserChipTemp","laserHouseTemp"}
+            private string paramNames2 = {"mctTemp","mctHouseTemp","laserCurrent","refCellSig2f","alarmLower","alarmUpper","cleaningFlag"}
+            return(Concat(paramNames1, paramNames2))
+            
+         case(instrumentType == "icad200de")
+            private string paramNames1 = {"no2vmr","noxvmr","novmr","no2vmre","noxvmre","novmre","t0","t2","p","tp","tsam","rds","co2vmr","pcell1","pcell2","sv","ftotal","fo3","int1","int2","ssch1","ssch2"}
+            private string paramNames2 = {"no2conv","timeoffset1","timeoffset2","timesincezero1","timesincezero2","measurmentstate","measurementsubstate","honovmr","honovmre","glyoxalvmr","glyoxalvmre"}
+            private string paramNames3 = {"oxvmr","oxvmre","o3vmr","o3vmre"}
+            return(Concat(Concat(paramNames1,paramNames2),paramNames3))
+            
+            
+      endcase
+    
+   endfunction
+   
+   function buildChannelNames()
+      
+      if(IsEmpty(serialNumber))
+         throw("Please set serialNumber via setSerialNumber() before creating channels")
+      endif
+      
+      // tidy paramNames so they can work as channel names
+      private string myMessages = remove(paramNames," ")
+      myMessages = remove(myMessages, "?")
+   
+      for(private i = 0, i < numRows(myMessages), i++)
+         channelNames[i] = instrumentType+"_"+serialNumber+"_"+myMessages[i]
+      endfor
+   endfunction
+   
+   function createChannels()
+      if(IsEmpty(instrumentName))
+         throw("Please set instrumentName via setInstrumentName before creating channels")
+      endif
+      
+      buildChannelNames()
+      for(private i = 0, i < numRows(channelNames), i++)
+         channel.Add(channelNames[i],"test", 1, "A to D", 0,0,0,"",instrumentName)
+         execute(channelNames[i]+".HistoryLength = historyLength")
+      endfor
+      
+   endfunction
+   
+   
+endclass
+
+// ### Polling
+class pollingInstrument parent instrument
+   
+   local string messageStart
+   
+   function setMessageStart(string strIn)
+      messageStart = strIn
+   endfunction
+   
+   // general version of getAll() - loops over all messages and passes them to parseResponse before adding to channel
+   function getAll()
+
+      private string thisMessage 
+      private string thisResponse
+      private string responseParsed
+      
+      if(IsEmpty(messageStart))
+         throw("Polling instruments require messageStart to be set via setMessageStart()")
+      endif
+      
+       for(private i = 0, i < numRows(paramNames), i++)
+            try 
+               thisMessage = messageStart+paramNames[i]+chr(13)
+               thisResponse = Poll(thisMessage, 13)
+               responseParsed = parseResponse(thisResponse, inst, i)
+               execute(channelNames[i]+".AddValue(responseParsed)")
+            catch()
+               execute(channelNames[i]+".AddValue(1/0)")
+            endcatch
+			
+			delay(0.4)
+       
+         endfor
+   endfunction
+   
+endclass
+
+class teledyne parent pollingInstrument
+   
+   function onCreate()
+      setMessageStart("T ")
+   endfunction
+   
+   // parseResponse for Teledyne instruments, splits on the "=" and takes the value after it, followed by spliting on space and taking the 1st element
+   // need to port the message checking code here
+   // t200up has the "O3GEN FL" or "OZONE FL" issue that also needs including - if(instrumnetType == "t200up") is probably fine
+   function parseResponse(string response) 
+   
+      private responseParsed      
+      responseParsed = strToDouble(parse(parse(response, 1, "="), 0, " "))
+      return(responseParsed)
+   endfunction
+endclass
+
+class thermo parent pollingInstrument
+   
+   function onCreate()
+      setMessageStart("")
+   endfunction
+   
+   //parseResponse for Teledyne instrumnets - split on space and take the 2nd element, unless thats a NaN when coherced to double, in which case take the 3rd
+   function parseResponse(string response) 
+      
+      private responseParsed
+		responseParsed = strToDouble(parse(response, 1, " "))
+      
+		if(responseParsed == NaN())
+			responseParsed = strToDouble(parse(response, 2, " "))
+		endif
+  
+      return(responseParsed)
+   endfunction
+endclass
+
+class aerolaser parent pollingInstrument
+   
+   function onCreate()
+      setMessageStart("")
+   endfunction
+   
+   //parseResponse for aerolaser instrumnets - strToDouble only
+   function parseResponse(string response) 
+      
+      private responseParsed
+		responseParsed = strToDouble(response)
+  
+      return(responseParsed)
+   endfunction
+endclass
+
+// palas class here
+
+// teledyne children
+class t200up parent teledyne
+   
+   function onCreate()
+      setInstrumentType("t200up")
+   endfunction
+   
+endclass
+
+class t101 parent teledyne
+   
+   function onCreate()
+      setInstrumentType("t101")
+   endfunction
+   
+endclass
+
+class t100u parent teledyne
+   
+   function onCreate()
+      setInstrumentType("t100u")
+   endfunction
+   
+endclass
+
+class t300u parent teledyne
+   
+   function onCreate()
+      setInstrumentType("t300u")
+   endfunction
+   
+endclass
+
+class t500u parent teledyne
+   
+   function onCreate()
+      setInstrumentType("t500u")
+   endfunction
+   
+endclass
+
+// thermo children
+
+class thermo49i parent thermo
+   
+   function onCreate()
+      setInstrumentType("thermo49i")
+   endfunction
+   
+endclass
+
+class thermo43i parent thermo
+   
+   function onCreate()
+      setInstrumentType("thermo43i")
+   endfunction
+   
+endclass
+
+class thermo450i parent thermo
+   
+   function onCreate()
+      setInstrumentType("thermo450i")
+   endfunction
+   
+endclass
+
+class thermo42c parent thermo
+   
+   function onCreate()
+      setInstrumentType("thermo42C")
+   endfunction
+   
+endclass
+
+class thermo42i parent thermo
+   
+   function onCreate()
+      setInstrumentType("thermo42i")
+   endfunction
+   
+endclass
+
+// palas children
+// (aqguard)
+
+// #### Bayern-Hessen
+class bayernHessenInstrument parent instrument
+   
+   local string message
+   
+   function setMessage(string strIn)
+      message = strIn
+   endfunction
+   
+endclass
+
+class airyx parent bayernHessenInstrument
+   
+   // parseResponse for airyx instrument - bayern-hessen message contains multiple fields
+   // returns an array that getAll() can then assign to channels
+   
+   function onCreate()
+      setMessage(chr(2)+"DA"+chr(3)+"04")
+   endfunction
+   
+   function parseResponse() 
+      
+      delay(0.5)
+      private string stx = Read(1) // start bit
+      private string md = Read(2) // token
+      private nn = Read(3) // number of measurements
+      private width = 7 // array dimention
+      private returnArray = fill(-1, nn*width)
+
+      for(private i = 0, i < nn, i++)
+         private string nnn = Read(4)
+         private valNum = Read(5)
+         private string valExpStr = Read(3)
+         private valExp = strToDouble(valExpStr)
+         private hash = Read(1) // sink hash
+         //private val = valNum * (10^valExp)
+         private string status = Read(3)
+         private string error = Read(3)
+         private string serial = Read(4)
+         private string hhhhhh = Read(7)
+         
+         returnArray[(width*i)] = nnn
+         returnArray[(width*i)+1] = valNum
+         returnArray[(width*i)+2] = valExp
+         returnArray[(width*i)+3] = status
+         returnArray[(width*i)+4] = error
+         returnArray[(width*i)+5] = serial
+         returnArray[(width*i)+6] = hhhhhh
+
+      endfor
+
+      returnArray = unflatten(returnArray, width)
+      return(returnArray)
+      
+   endfunction
+endclass
+
+class icad200de parent airyx
+   
+   function onCreate()
+      setInstrumentType("icad200de")
+   endfunction
+   
+   // getAll for icad200de - I think this needs to be instrument level so we know what channels match what IDs
+   function getAll()
+      
+      private response
+      
+      if(IsEmpty(message))
+         throw("Bayern-Hessen instruments require message to be set via setMessage()")
+      endif
+      
+      Purge()
+      Write(message)
+      response = parseResponse()
+      for(private i = 0, i < numRows(response), i++)
+         
+         private messageId = response[i][0]
+         private val = response[i][1]*(10^response[i][2])
+         try
+            execute(channelNames[messageId]+".AddValue(val)")
+         catch()
+            execute(channelNames[messageId]+".AddValue(1/0)")
+         endcatch
+      endfor
+   endfunction
+endclass
+
+// ### Streaming
+
+class streamingInstrument parent instrument
+   // only here right now to match polling/bayern-hessen structure
+endclass
+
+class tech2b parent streamingInstrument
+   function log()
+      private string response = ""
+      private responseParsed
+      
+      try // catch timeouts
+         response = readUntil(13)
+      catch()
+      endcatch
+      
+      if(!IsEmpty(response)) // did we get a response?
+         response = parse(response, -1, ",")
+         
+         for(private i = 0, i < 4, i++)
+            try
+               responseParsed = strToDouble(response[i])
+               execute(channelNames[i]+".addValue(responseParsed)")
+            catch()
+               execute(channelNames[i]+".addValue(1/0)")
+            endcatch
+         endfor
+      endif
+   endfunction
+   
+endclass
+
+class healthyPhoton parent streamingInstrument
+   
+   function log()
+      private string response = ""
+      private responseParsed
+      
+      try // catch timeouts
+         response = readUntil(13)
+      catch()
+      endcatch
+      
+      if(!IsEmpty(response)) // did we get a response?
+         response = parse(response, -1, ",")
+         // sometimes it sends a weird message with no commas, so we check if there are enough values
+         // there is one more element in the response (reserved 0000 at the end of the message), so we add 1 to numRows(channelNames)
+         if(numRows(response) == numRows(channelNames)+1) 
+            for(private i = 0, i < numRows(channelNames), i++) 
+               
+               if(paramNames[i] == "alarmLower" | paramNames[i] == "alarmUpper")
+                  responseParsed = strToDouble("0x"+response[i])
+               else
+                  responseParsed = strToDouble(response[i])
+               endif
+               try
+                  execute(channelNames[i]+".addValue(responseParsed)")
+               catch()
+                  execute(channelNames[i]+".addValue(1/0)")
+               endcatch
+               
+            endfor
+         endif
+      endif
+      
+   endfunction
+   
+endclass
+
+class aerodyne parent streamingInstrument
+   
+   function parseResponse()
+      
+   endfunction
+   
+endclass
+
+// tech2b children
+
+class o32b parent tech2b
+   
+   function onCreate()
+      setInstrumentType("o32b")
+   endfunction
+   
+endClass
+
+// healthyPhoton children
+
+class ht8700e parent healthyPhoton
+   function onCreate()
+      setInstrumentType("ht8700e")
+   endfunction
+endclass
+
+// aerodyne children
+class ethanetildas parent aerodyne
+   function onCreate()
+      setInstrumentType("ethanetildas")
+   endfunction
+   
+endclass
