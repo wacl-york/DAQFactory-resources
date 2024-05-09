@@ -82,29 +82,29 @@ class commDevice
       // this function will poll the port with given string and read
       // the response until the given character.  Returns NULL (empty)
       // if there is an error
-
       if (argc < 2)
          throw("Invalid number of parameters")
       endif
+      
       private string in
       try
          // lock the port
-         if (!LockPort())
+         if (!PortOb.LockPort())
             throw("Unable to lock port")
          endif
          // clear anything pending
-         Purge()
+         PortOb.Purge()
          // output our string
-         Write(out)
+         PortOb.Write(out)
          // and read until the eol:
          in = ReadUntil(until) 
          // release the port
-         UnlockPort()
+         PortOb.UnlockPort()
          // and return the response
          return(in)
       catch()
          // error occured
-         UnlockPort()
+         PortOb.UnlockPort()
          throw()
       endcatch
       // return NULL to indicate error.  This should never happen
@@ -134,7 +134,7 @@ class instrument parent commDevice
       instrumentName = strIn
    endfunction
    
-   // Set the instrumnet type but also trigger the creation of the paramNames
+   // Set the instrument type but also trigger the creation of the paramNames
    // checks that the instrument is listed in listInstrumentTypes() as a double check that the instrument has been implemented
    function setInstrumentType(string strIn)
       private instrumentExists = 0
@@ -146,7 +146,7 @@ class instrument parent commDevice
       endfor
       
       if(instrumentExists == 0)
-         throw("Instrument is not registed in listInstrumnetTypes()")
+         throw("Instrument is not registed in listInstrumentTypes()")
       endif
       
       instrumentType = strIn
@@ -155,7 +155,7 @@ class instrument parent commDevice
    
    // returns a list of instrument types supported by this class
    function listInstrumentTypes()
-      return({"t101", "t100u", "al5002", "t200up", "thermo49i", "thermo43i", "aqguard", "aqguardbins", "t300u", "t500u", "thermo450i", "thermo42C", "thermo42i", "ht8700e", "icad200de"})
+      return({"t101", "t100u", "al5002", "t200up", "thermo49i", "thermo43i", "aqguard", "aqguardbins", "t300u", "t500u", "thermo450i", "thermo42C", "thermo42i", "ht8700e", "icad200de", "ethanetildas","gla131","gpsr","gpsl"})
    endfunction
    
    // contains all the parameter names associated with each instrument
@@ -214,7 +214,26 @@ class instrument parent commDevice
             private string paramNames3 = {"oxvmr","oxvmre","o3vmr","o3vmre"}
             return(Concat(Concat(paramNames1,paramNames2),paramNames3))
             
+         case(instrumentType == "ethanetildas")
+            return({"timestamp","ethane","methane","water","boxtemp","cellpressure"})
             
+         case(instrumentType == "gpsr")
+            private string paramNames1 = {"rmctime","rmcstatus", "rmclat", "rmclatdir", "rmclon", "rmclondir", "rmcspdOvrGnd","rmccourseOvrGnd"} // rmc
+            private string paramNames2 = {"ggatime","ggalat", "ggalatdir", "ggalon","ggalondir", "ggagpsqual", "ggansat","ggahoriPrec", "ggaheight", "ggageoidalheight"} // gga
+            return(Concat(paramNames1, paramNames2))
+            
+         case(instrumentType == "gpsl")
+            private string paramNames1 = {"rmctime","rmcstatus", "rmclat", "rmclatdir", "rmclon", "rmclondir", "rmcspdOvrGnd","rmccourseOvrGnd"} // rmc
+            private string paramNames2 = {"ggatime","ggalat", "ggalatdir", "ggalon","ggalondir", "ggagpsqual", "ggansat","ggahoriPrec", "ggaheight", "ggageoidalheight"} // gga
+            private string paramNames3 = {"hdmhead", "hdghead"}
+            return(Concat(paramNames1, Concat(paramNames2, paramNames3)))
+         
+         case(instrumentType == "gla131")
+           // private string paramNames1 = {"timestamp", "ch4ppm", "ch4ppmsd", "co2ppm","co2ppmsd","h2oppm","h2oppmsd", "ch4dppm","ch4dppmsd","co2dppm"}
+           // private string paramNames2 = {"co2dppmsd","gasptorr", "gasptorrsd","gastc","gastcsd","ambtc","ambtcsd","rd0us","rd0ussd","rd1us","rd1ussd"}
+           // private string paramNames3 = {"gnd","ltc0v", "ltc0vsd", "ltc1v","ltc1vsd","battv","battvsd","battperc","battpercsd","fitflag","miuvalve","miudesc"}
+           // return(Concat(Concat(paramNames1,paramNames2),paramNames3))
+           return({"timestamp", "ch4ppm", "ch4ppmsd", "co2ppm"})
       endcase
     
    endfunction
@@ -295,7 +314,7 @@ class teledyne parent pollingInstrument
    
    // parseResponse for Teledyne instruments, splits on the "=" and takes the value after it, followed by spliting on space and taking the 1st element
    // need to port the message checking code here
-   // t200up has the "O3GEN FL" or "OZONE FL" issue that also needs including - if(instrumnetType == "t200up") is probably fine
+   // t200up has the "O3GEN FL" or "OZONE FL" issue that also needs including - if(instrumentType == "t200up") is probably fine
    function parseResponse(string response) 
    
       private responseParsed      
@@ -310,7 +329,7 @@ class thermo parent pollingInstrument
       setMessageStart("")
    endfunction
    
-   //parseResponse for Teledyne instrumnets - split on space and take the 2nd element, unless thats a NaN when coherced to double, in which case take the 3rd
+   //parseResponse for Teledyne instruments - split on space and take the 2nd element, unless thats a NaN when coherced to double, in which case take the 3rd
    function parseResponse(string response) 
       
       private responseParsed
@@ -330,7 +349,7 @@ class aerolaser parent pollingInstrument
       setMessageStart("")
    endfunction
    
-   //parseResponse for aerolaser instrumnets - strToDouble only
+   //parseResponse for aerolaser instruments - strToDouble only
    function parseResponse(string response) 
       
       private responseParsed
@@ -425,6 +444,14 @@ class thermo42i parent thermo
    
 endclass
 
+// aerolaser children
+
+class al5002 parent aerolaser
+   function onCreate()
+      setInstrumentType("al5002")
+   endfunction
+endclass
+
 // palas children
 // (aqguard)
 
@@ -449,20 +476,19 @@ class airyx parent bayernHessenInstrument
    endfunction
    
    function parseResponse() 
-      
       delay(0.5)
       private string stx = Read(1) // start bit
       private string md = Read(2) // token
       private nn = Read(3) // number of measurements
       private width = 7 // array dimention
       private returnArray = fill(-1, nn*width)
-
+      ?nn
       for(private i = 0, i < nn, i++)
          private string nnn = Read(4)
          private valNum = Read(5)
          private string valExpStr = Read(3)
          private valExp = strToDouble(valExpStr)
-         private hash = Read(1) // sink hash
+         private sink = Read(1) // sink hash
          //private val = valNum * (10^valExp)
          private string status = Read(3)
          private string error = Read(3)
@@ -478,7 +504,13 @@ class airyx parent bayernHessenInstrument
          returnArray[(width*i)+6] = hhhhhh
 
       endfor
+      sink = read(3)
 
+      if(nn >= 24)
+         private nestArray = parseResponse()
+         returnArray = Concat(Flatten(returnArray), Flatten(nestArray))
+      endif
+      
       returnArray = unflatten(returnArray, width)
       return(returnArray)
       
@@ -587,11 +619,35 @@ endclass
 
 class aerodyne parent streamingInstrument
    
-   function parseResponse()
+endclass
+
+class lgr_gga parent streamingInstrument
+   
+   function log()
+      private string response = ""
+      private responseParsed
       
+      try // catch timeouts
+         response = readUntil(13)
+      catch()
+      endcatch
+      
+      if(!IsEmpty(response)) // did we get a response?
+         response = parse(response, -1, ",")
+         
+         for(private i = 0, i < numRows(channelNames), i++)
+            try
+               responseParsed = strToDouble(response[i])
+               execute(channelNames[i]+".addValue(responseParsed)")
+            catch()
+               execute(channelNames[i]+".addValue(1/0)")
+            endcatch
+         endfor
+      endif
    endfunction
    
 endclass
+   
 
 // tech2b children
 
@@ -617,4 +673,112 @@ class ethanetildas parent aerodyne
       setInstrumentType("ethanetildas")
    endfunction
    
+   function log()
+      
+      private string response
+      private responseParsed
+      
+      try // catch timeouts
+         response = readUntil(13)
+      catch()
+      endcatch
+      
+      if(!IsEmpty(response)) // did we get a response?
+         response = parse(response, -1, ",")
+         private index = {0,1,2,3,9,10} // to skip the missing fields
+         for(private i = 0, i < numRows(index), i++)
+            try
+               responseParsed = strToDouble(response[index[i]])
+               execute(channelNames[i]+".addValue(responseParsed)")
+            catch()
+               ?i
+               execute(channelNames[i]+".addValue(1/0)")
+            endcatch
+         endfor
+      endif
+   endfunction
 endclass
+
+   // lgr
+class gla131 parent lgr_gga
+   function onCreate()
+      setInstrumentType("gla131")
+   endfunction
+endclass
+
+
+// gps
+class gps parent streamingInstrument
+   
+   function log()
+      
+      private string response
+      private string responseParsed
+      private string head 
+
+      try // catch timeouts
+         response = readUntil(13)
+      catch()
+      endcatch
+      ?"a"
+      if(!IsEmpty(response)) 
+         ?"b"
+         response = parse(response, -1, ",")
+         ?response
+         head = right(response[0], 3) // first letters correspond to satellite type - right 3 are NMEA sentence definition
+         ?head
+         case(head == "RMC")
+            for(private i = 1, i < 9 , i++)
+               responseParsed = strToDouble(response[i])
+               try
+                  execute(channelNames[i]+".addValue(responseParsed)")
+               catch()
+                  execute(channelNames[i]+".addValue(1/0)")
+               endcatch
+            endfor
+        
+         case(head == "GGA")
+            for(private i = 9, i < 19, i++)
+               responseParsed = strToDouble(response[i])
+               try
+                  execute(channelNames[i]+".addValue(responseParsed)")
+               catch()
+                  execute(channelNames[i]+".addValue(1/0)")
+               endcatch
+            endfor
+            
+         case(head == "HDM")
+            responseParsed = strToDouble(response[1])
+            try
+               execute(channelNames[19]+".addValue(responseParsed)")
+            catch()
+               execute(channelNames[19]+".addValue(1/0)")
+            endcatch
+         case(head == "HDG")
+            responseParsed = strToDouble(response[1])
+            try
+               execute(channelNames[20]+".addValue(responseParsed)")
+            catch()
+               execute(channelNames[20]+".addValue(1/0)")
+            endcatch
+         endcase
+         
+      endif
+      
+   endfunction
+endclass
+
+class gpsr parent gps
+   function onCreate()
+      setInstrumentType("gpsr")
+   endfunction
+   
+endclass
+
+class gpsl parent gps
+   function onCreate()
+      setInstrumentType("gpsl")
+   endfunction
+   
+endclass
+
