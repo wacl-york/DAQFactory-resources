@@ -217,16 +217,16 @@ class instrument parent commDevice
          case(instrumentType == "ethanetildas")
             return({"timestamp","ethane","methane","water","boxtemp","cellpressure"})
             
-         case(instrumentType == "gpsr")
-            private string paramNames1 = {"rmctime","rmcstatus", "rmclat", "rmclatdir", "rmclon", "rmclondir", "rmcspdOvrGnd","rmccourseOvrGnd"} // rmc
-            private string paramNames2 = {"ggatime","ggalat", "ggalatdir", "ggalon","ggalondir", "ggagpsqual", "ggansat","ggahoriPrec", "ggaheight", "ggageoidalheight"} // gga
-            return(Concat(paramNames1, paramNames2))
-            
-         case(instrumentType == "gpsl")
-            private string paramNames1 = {"rmctime","rmcstatus", "rmclat", "rmclatdir", "rmclon", "rmclondir", "rmcspdOvrGnd","rmccourseOvrGnd"} // rmc
-            private string paramNames2 = {"ggatime","ggalat", "ggalatdir", "ggalon","ggalondir", "ggagpsqual", "ggansat","ggahoriPrec", "ggaheight", "ggageoidalheight"} // gga
+         case(instrumentType == "gpsr" | instrumentType == "gpsl")
+            private string paramNames1 = {"rmctime","rmcstatus", "rmclat", "rmclatdir", "rmclon", "rmclondir", "rmcspdOvrGnd","rmccourseOvrGnd","rmcdate","rmcmagvar"} // rmc
+            private string paramNames2 = {"ggatime","ggalat", "ggalatdir", "ggalon","ggalondir", "ggafixtype", "ggansat","ggahdop", "ggaheight","ggaheightm", "ggageoidheight","ggageoidheightm","ggacorrage"} // gga
             private string paramNames3 = {"hdmhead", "hdghead"}
-            return(Concat(paramNames1, Concat(paramNames2, paramNames3)))
+            
+            if(instrumentType == "gpsr")
+               return(Concat(paramNames1, paramNames2))
+            else
+               return(Concat(paramNames1, Concat(paramNames2, paramNames3)))
+            endif
          
          case(instrumentType == "gla131")
            // private string paramNames1 = {"timestamp", "ch4ppm", "ch4ppmsd", "co2ppm","co2ppmsd","h2oppm","h2oppmsd", "ch4dppm","ch4dppmsd","co2dppm"}
@@ -707,75 +707,92 @@ class gla131 parent lgr_gga
 endclass
 
 
-// gps
-class gps parent streamingInstrument
+// nmea
+class nmea parent streamingInstrument
+   
+   local nMessages
    
    function log()
       
       private string response
       private string responseParsed
       private string head 
-
+      
       try // catch timeouts
-         response = readUntil(13)
+         response = readUntil(10)
       catch()
       endcatch
-      ?"a"
-      if(!IsEmpty(response)) 
-         ?"b"
-         response = parse(response, -1, ",")
-         ?response
-         head = right(response[0], 3) // first letters correspond to satellite type - right 3 are NMEA sentence definition
-         ?head
+         
+      response = parse(response, -1, ",")
+      head = right(response[0], 3) // first letters correspond to satellite type - right 3 are NMEA sentence definition
+      switch
          case(head == "RMC")
-            for(private i = 1, i < 9 , i++)
-               responseParsed = strToDouble(response[i])
+            if(instrumentType == "gpsl")
+               private rmcMax = numRows(response)-2 // the gpsl has an extra field on its RMC sentence... why!
+            else
+               private rmcMac = numRows(response)-1
+            endif
+            
+            for(private i = 1, i < rmcMax, i++)
+               private channelIndex = i-1
+               if(i == 2 | i == 4 | i == 6)
+                  responseParsed = response[i]
+               else
+                  responseParsed = strToDouble(response[i])
+               endif
+
                try
-                  execute(channelNames[i]+".addValue(responseParsed)")
+                  execute(channelNames[channelIndex]+".addValue(responseParsed)")
                catch()
-                  execute(channelNames[i]+".addValue(1/0)")
+                  execute(channelNames[channelIndex]+".addValue(1/0)")
                endcatch
             endfor
         
          case(head == "GGA")
-            for(private i = 9, i < 19, i++)
-               responseParsed = strToDouble(response[i])
+            for(private i = 1, i < numRows(response)-1, i++)
+               private channelIndex = i+9
+               if(i == 3 | i == 5 | i == 10 | i == 12)
+                  responseParsed = response[i]
+               else
+                  responseParsed = strToDouble(response[i])
+               endif
+
                try
-                  execute(channelNames[i]+".addValue(responseParsed)")
+                  execute(channelNames[channelIndex]+".addValue(responseParsed)")
                catch()
-                  execute(channelNames[i]+".addValue(1/0)")
+                  execute(channelNames[channelIndex]+".addValue(1/0)")
                endcatch
             endfor
             
          case(head == "HDM")
             responseParsed = strToDouble(response[1])
             try
-               execute(channelNames[19]+".addValue(responseParsed)")
+               execute(channelNames[23]+".addValue(responseParsed)")
             catch()
-               execute(channelNames[19]+".addValue(1/0)")
+               execute(channelNames[23]+".addValue(1/0)")
             endcatch
          case(head == "HDG")
             responseParsed = strToDouble(response[1])
             try
-               execute(channelNames[20]+".addValue(responseParsed)")
+               execute(channelNames[24]+".addValue(responseParsed)")
             catch()
-               execute(channelNames[20]+".addValue(1/0)")
+               execute(channelNames[24]+".addValue(1/0)")
             endcatch
-         endcase
-         
-      endif
+      endcase
       
    endfunction
 endclass
 
-class gpsr parent gps
+class gpsr parent nmea
+   
    function onCreate()
       setInstrumentType("gpsr")
+      nMessages = 6
    endfunction
    
 endclass
 
-class gpsl parent gps
+class gpsl parent nmea
    function onCreate()
       setInstrumentType("gpsl")
    endfunction
