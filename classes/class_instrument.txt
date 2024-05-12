@@ -155,7 +155,9 @@ class instrument parent commDevice
    
    // returns a list of instrument types supported by this class
    function listInstrumentTypes()
-      return({"t101", "t100u", "al5002", "t200up", "thermo49i", "thermo43i", "aqguard", "aqguardbins", "t300u", "t500u", "thermo450i", "thermo42C", "thermo42i", "ht8700e", "icad200de", "ethanetildas","gla131","gpsr","gpsl"})
+      private string part1 = {"t101", "t100u", "al5002", "t200up", "thermo49i", "thermo43i", "aqguard", "aqguardbins", "t300u", "t500u", "thermo450i"}
+      private string part2 = {"thermo42C", "thermo42i", "ht8700e", "icad200de", "ethanetildas","gla131","gpsr","gpsl","windsonic","tsi4000"}
+      return(Concat(part1, part2))
    endfunction
    
    // contains all the parameter names associated with each instrument
@@ -229,11 +231,19 @@ class instrument parent commDevice
             endif
          
          case(instrumentType == "gla131")
-           // private string paramNames1 = {"timestamp", "ch4ppm", "ch4ppmsd", "co2ppm","co2ppmsd","h2oppm","h2oppmsd", "ch4dppm","ch4dppmsd","co2dppm"}
-           // private string paramNames2 = {"co2dppmsd","gasptorr", "gasptorrsd","gastc","gastcsd","ambtc","ambtcsd","rd0us","rd0ussd","rd1us","rd1ussd"}
-           // private string paramNames3 = {"gnd","ltc0v", "ltc0vsd", "ltc1v","ltc1vsd","battv","battvsd","battperc","battpercsd","fitflag","miuvalve","miudesc"}
-           // return(Concat(Concat(paramNames1,paramNames2),paramNames3))
-           return({"timestamp", "ch4ppm", "ch4ppmsd", "co2ppm"})
+            private string paramNames1 = {"timestamp", "ch4ppm", "ch4ppmsd", "co2ppm","co2ppmsd","h2oppm","h2oppmsd", "ch4dppm","ch4dppmsd","co2dppm"}
+            private string paramNames2 = {"co2dppmsd","gasptorr", "gasptorrsd","gastc","gastcsd","ambtc","ambtcsd","rd0us","rd0ussd","rd1us","rd1ussd"}
+            private string paramNames3 = {"rd0rawus","ltc0v", "ltc0vsd", "ltc1v","ltc1vsd","Hz","Hzsd","battv","battvsd","battperc","battpercsd","tempstatusma"}
+            private string paramNames4 = {"analyserstatusma","fitflag","miuvalve","miudesc"}
+            return(Concat(Concat(Concat(paramNames1,paramNames2),paramNames3), paramNames4))
+           //return({"timestamp", "ch4ppm", "ch4ppmsd", "co2ppm","co2ppmsd", })
+           
+         case(instrumentType == "windsonic")
+            return({"winddir","windspeed"})
+            
+         case(instrumentType == "tsi4000")
+               return({"flow","temp","press"})
+            
       endcase
     
    endfunction
@@ -283,7 +293,7 @@ class pollingInstrument parent instrument
 
       private string thisMessage 
       private string thisResponse
-      private string responseParsed
+      private responseParsed
       
       if(IsEmpty(messageStart))
          throw("Polling instruments require messageStart to be set via setMessageStart()")
@@ -477,43 +487,46 @@ class airyx parent bayernHessenInstrument
    
    function parseResponse() 
       delay(0.5)
-      private string stx = Read(1) // start bit
-      private string md = Read(2) // token
-      private nn = Read(3) // number of measurements
-      private width = 7 // array dimention
-      private returnArray = fill(-1, nn*width)
-      ?nn
-      for(private i = 0, i < nn, i++)
-         private string nnn = Read(4)
-         private valNum = Read(5)
-         private string valExpStr = Read(3)
-         private valExp = strToDouble(valExpStr)
-         private sink = Read(1) // sink hash
-         //private val = valNum * (10^valExp)
-         private string status = Read(3)
-         private string error = Read(3)
-         private string serial = Read(4)
-         private string hhhhhh = Read(7)
+      try
+         private string stx = Read(1) // start bit
+         private string md = Read(2) // token
+         private nn = Read(3) // number of measurements
+         private width = 7 // array dimention
+         private returnArray = fill(-1, nn*width)
          
-         returnArray[(width*i)] = nnn
-         returnArray[(width*i)+1] = valNum
-         returnArray[(width*i)+2] = valExp
-         returnArray[(width*i)+3] = status
-         returnArray[(width*i)+4] = error
-         returnArray[(width*i)+5] = serial
-         returnArray[(width*i)+6] = hhhhhh
+         for(private i = 0, i < nn, i++)
+            private string nnn = Read(4)
+            private valNum = Read(5)
+            private string valExpStr = Read(3)
+            private valExp = strToDouble(valExpStr)-3 // fix exponent
+            private sink = Read(1) // sink hash
+            //private val = valNum * (10^valExp)
+            private string status = Read(3)
+            private string error = Read(3)
+            private string serial = Read(4)
+            private string hhhhhh = Read(7)
+            
+            returnArray[(width*i)] = nnn
+            returnArray[(width*i)+1] = valNum
+            returnArray[(width*i)+2] = valExp
+            returnArray[(width*i)+3] = status
+            returnArray[(width*i)+4] = error
+            returnArray[(width*i)+5] = serial
+            returnArray[(width*i)+6] = hhhhhh
 
-      endfor
-      sink = read(3)
+         endfor
+         sink = read(3)
 
-      if(nn >= 24)
-         private nestArray = parseResponse()
-         returnArray = Concat(Flatten(returnArray), Flatten(nestArray))
-      endif
-      
-      returnArray = unflatten(returnArray, width)
-      return(returnArray)
-      
+         if(nn >= 24)
+            private nestArray = parseResponse()
+            returnArray = Concat(Flatten(returnArray), Flatten(nestArray))
+         endif
+         
+         returnArray = unflatten(returnArray, width)
+         return(returnArray)
+      catch()
+         return(NULL)
+      endcatch
    endfunction
 endclass
 
@@ -535,16 +548,18 @@ class icad200de parent airyx
       Purge()
       Write(message)
       response = parseResponse()
-      for(private i = 0, i < numRows(response), i++)
-         
-         private messageId = response[i][0]
-         private val = response[i][1]*(10^response[i][2])
-         try
-            execute(channelNames[messageId]+".AddValue(val)")
-         catch()
-            execute(channelNames[messageId]+".AddValue(1/0)")
-         endcatch
-      endfor
+      if(!IsEmpty(response))
+         for(private i = 0, i < numRows(response), i++)
+            
+            private messageId = response[i][0]
+            private val = response[i][1]*(10^response[i][2])
+            try
+               execute(channelNames[messageId]+".AddValue(val)")
+            catch()
+               execute(channelNames[messageId]+".AddValue(1/0)")
+            endcatch
+         endfor
+      endif
    endfunction
 endclass
 
@@ -624,25 +639,43 @@ endclass
 class lgr_gga parent streamingInstrument
    
    function log()
-      private string response = ""
-      private responseParsed
-      
+      private string response
+      private string sink      
       try // catch timeouts
+         purge()
+         sink = readUntil(13)
+      catch()
+      endcatch
+      try
+         delay(0.09)
          response = readUntil(13)
       catch()
+         response = NULL
       endcatch
       
       if(!IsEmpty(response)) // did we get a response?
-         response = parse(response, -1, ",")
-         
-         for(private i = 0, i < numRows(channelNames), i++)
-            try
-               responseParsed = strToDouble(response[i])
-               execute(channelNames[i]+".addValue(responseParsed)")
-            catch()
-               execute(channelNames[i]+".addValue(1/0)")
-            endcatch
-         endfor
+         try // I don't like this trycatch 
+            response = parse(response, -1, ",")
+            for(private i = 0, i < numRows(channelNames), i++)
+               if(i == 0 | i == 36)
+                  private string responseParsedString = response[i]
+                  try
+                     execute(channelNames[i]+".addValue(responseParsedString)")
+                  catch()
+                     execute(channelNames[i]+".addValue(1/0)")
+                  endcatch
+               else
+                  private responseParsed = strToDouble(response[i])
+                  
+                  try
+                     execute(channelNames[i]+".addValue(responseParsed)")
+                  catch()
+                     execute(channelNames[i]+".addValue(1/0)")
+                  endcatch()
+               endif
+            endfor
+         catch()
+         endcatch
       endif
    endfunction
    
@@ -677,24 +710,44 @@ class ethanetildas parent aerodyne
       
       private string response
       private responseParsed
-      
+      private string sink   
+   
       try // catch timeouts
+         purge()
+         sink = readUntil(13)
+      catch()
+      endcatch
+      
+      try
+         delay(0.09)
          response = readUntil(13)
       catch()
+         response = NULL
       endcatch
       
       if(!IsEmpty(response)) // did we get a response?
          response = parse(response, -1, ",")
-         private index = {0,1,2,3,9,10} // to skip the missing fields
-         for(private i = 0, i < numRows(index), i++)
+         if(numRows(response) != 11) // if we don't get a full message try one more read
             try
-               responseParsed = strToDouble(response[index[i]])
-               execute(channelNames[i]+".addValue(responseParsed)")
+               response = readUntil(13)
+               response = parse(response, -1, ",")
             catch()
-               ?i
-               execute(channelNames[i]+".addValue(1/0)")
+               response = NULL
             endcatch
-         endfor
+         endif
+         
+         if(numRows(response) == 11)
+            private index = {0,1,2,3,9,10} // to skip the missing fields
+            for(private i = 0, i < numRows(index), i++)
+               try
+                  responseParsed = strToDouble(response[index[i]])
+                  execute(channelNames[i]+".addValue(responseParsed)")
+               catch()
+                  ?i
+                  execute(channelNames[i]+".addValue(1/0)")
+               endcatch
+            endfor
+         endif
       endif
    endfunction
 endclass
@@ -722,64 +775,65 @@ class nmea parent streamingInstrument
          response = readUntil(10)
       catch()
       endcatch
-         
-      response = parse(response, -1, ",")
-      head = right(response[0], 3) // first letters correspond to satellite type - right 3 are NMEA sentence definition
-      switch
-         case(head == "RMC")
-            if(instrumentType == "gpsl")
-               private rmcMax = numRows(response)-2 // the gpsl has an extra field on its RMC sentence... why!
-            else
-               private rmcMac = numRows(response)-1
-            endif
-            
-            for(private i = 1, i < rmcMax, i++)
-               private channelIndex = i-1
-               if(i == 2 | i == 4 | i == 6)
-                  responseParsed = response[i]
-               else
-                  responseParsed = strToDouble(response[i])
-               endif
-
-               try
-                  execute(channelNames[channelIndex]+".addValue(responseParsed)")
-               catch()
-                  execute(channelNames[channelIndex]+".addValue(1/0)")
-               endcatch
-            endfor
-        
-         case(head == "GGA")
-            for(private i = 1, i < numRows(response)-1, i++)
-               private channelIndex = i+9
-               if(i == 3 | i == 5 | i == 10 | i == 12)
-                  responseParsed = response[i]
-               else
-                  responseParsed = strToDouble(response[i])
-               endif
-
-               try
-                  execute(channelNames[channelIndex]+".addValue(responseParsed)")
-               catch()
-                  execute(channelNames[channelIndex]+".addValue(1/0)")
-               endcatch
-            endfor
-            
-         case(head == "HDM")
-            responseParsed = strToDouble(response[1])
-            try
-               execute(channelNames[23]+".addValue(responseParsed)")
-            catch()
-               execute(channelNames[23]+".addValue(1/0)")
-            endcatch
-         case(head == "HDG")
-            responseParsed = strToDouble(response[1])
-            try
-               execute(channelNames[24]+".addValue(responseParsed)")
-            catch()
-               execute(channelNames[24]+".addValue(1/0)")
-            endcatch
-      endcase
       
+      if(!IsEmpty(response))
+         response = parse(response, -1, ",")
+         head = right(response[0], 3) // first letters correspond to satellite type - right 3 are NMEA sentence definition
+         switch
+            case(head == "RMC")
+               if(instrumentType == "gpsl")
+                  private rmcMax = numRows(response)-2 // the gpsl has an extra field on its RMC sentence... why!
+               else
+                  private rmcMax = numRows(response)-1
+               endif
+               
+               for(private i = 1, i < rmcMax, i++)
+                  private channelIndex = i-1
+                  if(i == 2 | i == 4 | i == 6)
+                     responseParsed = response[i]
+                  else
+                     responseParsed = strToDouble(response[i])
+                  endif
+
+                  try
+                     execute(channelNames[channelIndex]+".addValue(responseParsed)")
+                  catch()
+                     execute(channelNames[channelIndex]+".addValue(1/0)")
+                  endcatch
+               endfor
+           
+            case(head == "GGA")
+               for(private i = 1, i < numRows(response)-1, i++)
+                  private channelIndex = i+9
+                  if(i == 3 | i == 5 | i == 10 | i == 12)
+                     responseParsed = response[i]
+                  else
+                     responseParsed = strToDouble(response[i])
+                  endif
+
+                  try
+                     execute(channelNames[channelIndex]+".addValue(responseParsed)")
+                  catch()
+                     execute(channelNames[channelIndex]+".addValue(1/0)")
+                  endcatch
+               endfor
+               
+            case(head == "HDM")
+               responseParsed = strToDouble(response[1])
+               try
+                  execute(channelNames[23]+".addValue(responseParsed)")
+               catch()
+                  execute(channelNames[23]+".addValue(1/0)")
+               endcatch
+            case(head == "HDG")
+               responseParsed = strToDouble(response[1])
+               try
+                  execute(channelNames[24]+".addValue(responseParsed)")
+               catch()
+                  execute(channelNames[24]+".addValue(1/0)")
+               endcatch
+         endcase
+      endif
    endfunction
 endclass
 
@@ -798,4 +852,106 @@ class gpsl parent nmea
    endfunction
    
 endclass
+
+class windsonic parent streamingInstrument
+   
+   function onCreate()
+      setInstrumentType("windsonic")
+   endfunction
+   
+   function log()
+   
+      private string response
+      private string responseParsed
+      
+      try // catch timeouts
+         response = readUntil(13)
+      catch()
+      endcatch
+      
+      if(!IsEmpty(response))
+         response = parse(response,-1, ",")
+         for(private i = 1, i < 3, i++)
+         responseParsed = strToDouble(response[i])
+            try
+               execute(channelNames[i-1]+".addValue(responseParsed)")
+            catch()
+               execute(channelNames[i-1]+".addValue(1/0)")
+            endcatch
+         endfor
+      endif
+   endfunction
+endclass
+
+class TSI4000 parent pollingInstrument
+   function onCreate()
+      setInstrumentType("tsi4000")
+   endfunction
+   
+   function getSerialNumber()
+      purge()
+      write("SN"+chr(013))
+      private string sink = readUntil(13)
+      private string sn = readUntil(13)
+      return(sn)
+   endfunction
+   
+   function Poll(string out, until)
+      // this function will poll the port with given string and read
+      // the response until the given character.  Returns NULL (empty)
+      // if there is an error
+      if (argc < 2)
+         throw("Invalid number of parameters")
+      endif
+      
+      private string in
+      try
+         // lock the port
+         if (!PortOb.LockPort())
+            throw("Unable to lock port")
+         endif
+         // clear anything pending
+         PortOb.Purge()
+         // output our string
+         PortOb.Write(out)
+         ReadUntil(until) // skip affirm
+         // and read until the eol:
+         
+         in = ReadUntil(until) 
+         // release the port
+         PortOb.UnlockPort()
+         // and return the response
+         return(in)
+      catch()
+         // error occured
+         PortOb.UnlockPort()
+         throw()
+      endcatch
+      // return NULL to indicate error.  This should never happen
+      // because of the throw() statement above
+      return(NULL)
+   endfunction
+   
+   
+   function log()
+      
+      private string response = poll("DAFTP0001"+chr(13),13)
+      response = parse(response, -1, ",")
+      
+      for(private i = 0, i < numRows(channelNames), i++)
+            private responseParsed = strToDouble(response[i])
+            ?responseParsed
+         try
+            execute(channelNames[i]+".addValue(responseParsed)")
+         catch()
+            execute(channelNames[i]+".addValue(1/0)")
+         endcatch
+      endfor
+      
+   endfunction
+   
+endclass
+
+
+
 
