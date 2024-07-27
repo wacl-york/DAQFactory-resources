@@ -25,10 +25,15 @@ class commDevice
       createTCPPort(IPAddress, portNum, timeout)
       createNullDevice()
    endfunction
-      
+   
+   function inheritExistingDevice(deviceObject, portObject)
+      PortOb = portObject
+      DeviceOb = deviceObject
+      DeviceOb.protocolName = ""
+   endfunction
    
    // Creates a serial port
-   function createSerialPort(portNum, baud, bytesize, parity, stopbits, timeout)
+   function createSerialPort(portNum, baud, bytesize, string parity, stopbits, timeout)
       PortOb = new(CCommSerial)
       PortOb.Port = portNum
       PortOb.Baud = baud
@@ -111,6 +116,7 @@ class commDevice
       // because of the throw() statement above
       return(NULL)
    endfunction
+      
 endclass
 
 class instrument parent commDevice
@@ -156,7 +162,7 @@ class instrument parent commDevice
    // returns a list of instrument types supported by this class
    function listInstrumentTypes()
       private string part1 = {"t101", "t100u", "al5002", "t200up", "thermo49i", "thermo43i", "aqguard", "aqguardbins", "t300u", "t500u", "thermo450i"}
-      private string part2 = {"thermo42C", "thermo42i", "ht8700e", "icad200de", "ethanetildas","gla131","gpsr","gpsl","windsonic","tsi4000"}
+      private string part2 = {"thermo42C", "thermo42i", "ht8700e", "icad200de", "ethanetildas","gla131","gpsr","gpsl","windsonic","tsi4000","aeris_co_n2o","picarro_g2401"}
       return(Concat(part1, part2))
    endfunction
    
@@ -236,13 +242,25 @@ class instrument parent commDevice
             private string paramNames3 = {"rd0rawus","ltc0v", "ltc0vsd", "ltc1v","ltc1vsd","Hz","Hzsd","battv","battvsd","battperc","battpercsd","tempstatusma"}
             private string paramNames4 = {"analyserstatusma","fitflag","miuvalve","miudesc"}
             return(Concat(Concat(Concat(paramNames1,paramNames2),paramNames3), paramNames4))
-           //return({"timestamp", "ch4ppm", "ch4ppmsd", "co2ppm","co2ppmsd", })
+            //return({"timestamp", "ch4ppm", "ch4ppmsd", "co2ppm","co2ppmsd", })
            
          case(instrumentType == "windsonic")
             return({"winddir","windspeed"})
             
          case(instrumentType == "tsi4000")
-               return({"flow","temp","press"})
+            return({"flow","temp","press"})
+               
+         case(instrumentType == "aeris_co_n2o")
+            private string paramNames1 = {"timestamp","inletNumber","pressMbar","t0Degc","t1Degc","t2Degc","t5Degc","tgasDegc","laserPid","detectorPid"}
+            private string paramNames2 = {"win0Fit0","win0Fit1","win0Fit2","win0Fit3","win0Fit4","win0Fit5","win0Fit6","win0Fit7","win0Fit8","win0Fit9"}
+            private string paramNames3 = {"win1Fit0","win1Fit1","win1Fit2","win1Fit3","win1Fit4","win1Fit5","win1Fit6","win1Fit7","win1Fit8","win1Fit9"}
+            private string paramNames4 = {"detectorBackground","rampAmp1","n2oWetPpm","n2oDryPpm","h2oPpm","coWetPpm","coDryPpm","powerInputMv","tFetDegc"}
+            private string paramNames5 = {"tTecDegc","tTecSinkDegC","TecPowerW","wallCode","gpsTime","lat","lon","alt"}
+            return(Concat(Concat(Concat(Concat(paramNames1, paramNames2), paramNames3), paramNames4),paramNames5))
+            
+         case(instrumentType == "picarro_g2401")
+            return({"unixtime","co2Wet","ch4Wet","coDry","h2o","date","time"})
+
             
       endcase
     
@@ -339,7 +357,7 @@ class thermo parent pollingInstrument
       setMessageStart("")
    endfunction
    
-   //parseResponse for Teledyne instruments - split on space and take the 2nd element, unless thats a NaN when coherced to double, in which case take the 3rd
+   //parseResponse for Thermo instruments - split on space and take the 2nd element, unless thats a NaN when coherced to double, in which case take the 3rd
    function parseResponse(string response) 
       
       private responseParsed
@@ -640,22 +658,15 @@ class lgr_gga parent streamingInstrument
    
    function log()
       private string response
-      private string sink      
-      try // catch timeouts
-         purge()
-         sink = readUntil(13)
-      catch()
-      endcatch
       try
-         delay(0.09)
          response = readUntil(13)
       catch()
          response = NULL
       endcatch
       
       if(!IsEmpty(response)) // did we get a response?
-         try // I don't like this trycatch 
-            response = parse(response, -1, ",")
+         response = parse(response, -1, ",")
+         if(numRows(response) == numRows(paramNames))
             for(private i = 0, i < numRows(channelNames), i++)
                if(i == 0 | i == 36)
                   private string responseParsedString = response[i]
@@ -666,7 +677,6 @@ class lgr_gga parent streamingInstrument
                   endcatch
                else
                   private responseParsed = strToDouble(response[i])
-                  
                   try
                      execute(channelNames[i]+".addValue(responseParsed)")
                   catch()
@@ -674,11 +684,93 @@ class lgr_gga parent streamingInstrument
                   endcatch()
                endif
             endfor
-         catch()
-         endcatch
+         endif
       endif
    endfunction
    
+endclass
+
+class aeris_co_n2o parent streamingInstrument
+   
+   function onCreate()
+      setInstrumentType("aeris_co_n2o")
+   endfunction
+   
+   function log()
+      private string response
+      try
+         response = readUntil(13)
+      catch()
+         response = NULL
+      endcatch
+      
+      if(!IsEmpty(response)) // did we get a response?
+         response = parse(response, -1, ",")
+         if(numRows(response) == numRows(paramNames))
+            for(private i = 0, i < numRows(channelNames), i++)
+               if(i == 0)
+                  private string responseParsedString = response[i]
+                  try
+                     execute(channelNames[i]+".addValue(responseParsedString)")
+                  catch()
+                     execute(channelNames[i]+".addValue(1/0)")
+                  endcatch
+               else
+                  private responseParsed = strToDouble(response[i])
+                  try
+                     execute(channelNames[i]+".addValue(responseParsed)")
+                  catch()
+                     execute(channelNames[i]+".addValue(1/0)")
+                  endcatch()
+               endif
+            endfor
+         endif
+      endif
+      
+   endfunction
+   
+endclass
+
+class picarro_g2401 parent streamingInstrument
+   function onCreate()
+      setInstrumentType("picarro_g2401")
+   endfunction
+   
+   function log()
+      private string response
+      try
+         response = readUntil(13)
+      catch()
+         response = NULL
+      endcatch
+      
+      if(!IsEmpty(response)) // did we get a response?
+         response = HideHidden(response) // remove the extra CRLFs
+         // I think the response is fixed width (but different width per column) but I'm being lazy and 
+         // just splitting on " " and then removing elements of the array containing ""
+         private string bigArray = parse(response, -1, " ")
+         private string littleArray = Fill("", numRows(paramNames))
+         
+         private counter = 0
+         for(private i = 0, i < numRows(bigArray), i++)
+            if(bigArray[i] != "")
+               littleArray[counter] = bigArray[i]
+               counter++
+            endif
+         endfor
+
+         for(private i = 0, i < numRows(channelNames), i++)
+            private responseParsed = strToDouble(littleArray[i])
+            try
+               execute(channelNames[i]+".addValue(responseParsed)")
+            catch()
+               execute(channelNames[i]+".addValue(1/0)")
+            endcatch()
+         endfor
+      endif
+      
+   endfunction
+
 endclass
    
 
@@ -757,6 +849,7 @@ class gla131 parent lgr_gga
    function onCreate()
       setInstrumentType("gla131")
    endfunction
+   
 endclass
 
 
@@ -771,12 +864,13 @@ class nmea parent streamingInstrument
       private string responseParsed
       private string head 
       
-      try // catch timeouts
-         response = readUntil(10)
+      try
+         response = readUntil(13)
       catch()
+         response = null
       endcatch
       
-      if(!IsEmpty(response))
+      if(!IsEmpty(response)) // did we get a response?
          response = parse(response, -1, ",")
          head = right(response[0], 3) // first letters correspond to satellite type - right 3 are NMEA sentence definition
          switch
@@ -934,19 +1028,26 @@ class TSI4000 parent pollingInstrument
    
    
    function log()
+      private string response 
       
-      private string response = poll("DAFTP0001"+chr(13),13)
-      response = parse(response, -1, ",")
+      try
+         response = poll("DAFTP0001"+chr(13),13)
+      catch()
+         response = null
+      endcatch
       
-      for(private i = 0, i < numRows(channelNames), i++)
-            private responseParsed = strToDouble(response[i])
-            ?responseParsed
-         try
-            execute(channelNames[i]+".addValue(responseParsed)")
-         catch()
-            execute(channelNames[i]+".addValue(1/0)")
-         endcatch
-      endfor
+      if(!isEmpty(response))
+         response = parse(response, -1, ",")
+      
+         for(private i = 0, i < numRows(channelNames), i++)
+               private responseParsed = strToDouble(response[i])
+            try
+               execute(channelNames[i]+".addValue(responseParsed)")
+            catch()
+               execute(channelNames[i]+".addValue(1/0)")
+            endcatch
+         endfor
+      endif
       
    endfunction
    
