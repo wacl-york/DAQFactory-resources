@@ -1,0 +1,1562 @@
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Page.a_overview.X1674_Y140_Button.QuickSequence_0
+
+endseq(so2_air)
+beginseq(so2_cal)
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.aquire_CO_5, Priority: 5 - Acquisition
+
+CO_5.purge()
+
+while(1)
+   CO_5.log()
+endwhile
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.aquire_O3_10, Priority: 5 - Acquisition
+
+while(1)
+   O3_10.getAll()
+   delay(60)
+endwhile
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.aquire_O3_5, Priority: 5 - Acquisition
+
+while(1)
+   O3_5.getAll()
+   delay(60)
+endwhile
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.aquire_SO2_6, Priority: 5 - Acquisition
+
+while(1)
+   SO2_6.getAll()
+   delay(60)
+endwhile
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.aquire_picarro_1, Priority: 5 - Acquisition
+
+picarro_1.purge()
+
+while(1)
+   picarro_1.log()
+endwhile
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.class_instrument, Priority: 3 - Logging
+
+class commDevice
+   local PortOb
+   local DeviceOb
+   
+   // create ports   
+   // creates a device using the NULL protocol
+   function createNullDevice()
+      if (IsEmpty(PortOb))
+         throw("PortOb is empty, first create TCP or serial port")
+      endif
+      DeviceOb = new(CCommDevice)
+      DeviceOb.portObject = PortOb
+      DeviceOb.protocolName = ""
+   endfunction
+   
+   function createTCPPort(string IPAddress, portNum, timeout)
+      PortOb = new(CCommEthernet)
+      PortOb.address = IPAddress
+      PortOb.port = portNum
+      PortOb.timeout = timeout
+      InitComm()
+   endfunction
+   
+   function initTCP(string IPAddress, portNum, timeout)
+      createTCPPort(IPAddress, portNum, timeout)
+      createNullDevice()
+   endfunction
+   
+   function inheritExistingDevice(deviceObject, portObject)
+      PortOb = portObject
+      DeviceOb = deviceObject
+      DeviceOb.protocolName = ""
+   endfunction
+   
+   // Creates a serial port
+   function createSerialPort(portNum, baud, bytesize, string parity, stopbits, timeout)
+      PortOb = new(CCommSerial)
+      PortOb.Port = portNum
+      PortOb.Baud = baud
+      PortOb.ByteSize = bytesize
+      PortOb.Parity = parity
+      PortOb.StopBits = stopbits
+      PortOb.Timeout = timeout
+      InitComm()
+   endfunction
+
+   // initialised a serial port using the NULL Protocol
+   function initSerial(portNum, baud, bytesize, parity, stopbits, timeout)
+      createSerialPort(portNum, baud, bytesize, parity, stopbits, timeout)
+      createNullDevice()
+   endfunction
+   
+   // comms generics
+   function InitComm()
+      PortOb.InitComm()
+   endfunction
+   
+   function Purge()
+      PortOb.Purge()
+   endfunction
+   
+   function readUntil(until)
+      return(PortOb.ReadUntil(until))
+   endfunction
+   
+   function Write(string out)
+      PortOb.Write(out)
+   endfunction
+   
+   function Read(amt)
+      return(PortOb.Read(amt))
+   endfunction
+   
+   function Monitor()
+      PortOb.Monitor()
+   endfunction
+   
+   function LockPort()
+      PortOb.LockPort()
+   endfunction
+   
+   function UnlockPort()
+      PortOb.UnlockPort()
+   endfunction
+   
+   function Poll(string out, until)
+      // this function will poll the port with given string and read
+      // the response until the given character.  Returns NULL (empty)
+      // if there is an error
+      if (argc < 2)
+         throw("Invalid number of parameters")
+      endif
+      
+      private string in
+      try
+         // lock the port
+         if (!PortOb.LockPort())
+            throw("Unable to lock port")
+         endif
+         // clear anything pending
+         PortOb.Purge()
+         // output our string
+         PortOb.Write(out)
+         // and read until the eol:
+         in = ReadUntil(until) 
+         // release the port
+         PortOb.UnlockPort()
+         // and return the response
+         return(in)
+      catch()
+         // error occured
+         PortOb.UnlockPort()
+         throw()
+      endcatch
+      // return NULL to indicate error.  This should never happen
+      // because of the throw() statement above
+      return(NULL)
+   endfunction
+      
+endclass
+
+class instrument parent commDevice
+   local string paramNames
+   local string serialNumber
+   local string channelNames
+   local string instrumentName // use for channel grouping
+   local string instrumentType
+   local historyLength = 3600
+   
+   // instrument specifiers
+   function setSerialNumber(string strIn)
+      serialNumber = strIn
+   endfunction
+   
+   function setHistoryLength(in)
+      historyLength = in
+   endfunction
+   
+   function setInstrumentName(string strIn)
+      instrumentName = strIn
+   endfunction
+   
+   // Set the instrument type but also trigger the creation of the paramNames
+   // checks that the instrument is listed in listInstrumentTypes() as a double check that the instrument has been implemented
+   function setInstrumentType(string strIn)
+      private instrumentExists = 0
+      private string it = listInstrumentTypes()
+      for(private i = 0, i < numRows(it), i++)
+         if(strIn == it[i])
+            instrumentExists = 1
+         endif
+      endfor
+      
+      if(instrumentExists == 0)
+         throw("Instrument is not registed in listInstrumentTypes()")
+      endif
+      
+      instrumentType = strIn
+      paramNames = getParamNames()
+   endfunction
+   
+   // returns a list of instrument types supported by this class
+   function listInstrumentTypes()
+      private string part1 = {"t101", "t100u", "al5002", "t200up", "thermo49i", "thermo43i", "aqguard", "aqguardbins", "t300u", "t500u", "thermo450i"}
+      private string part2 = {"thermo42C", "thermo42i", "ht8700e", "icad200de", "ethanetildas","gla131","gpsr","gpsl","windsonic","tsi4000","aeris_co_n2o","picarro_g2401"}
+      return(Concat(part1, part2))
+   endfunction
+   
+   // contains all the parameter names associated with each instrument
+   // if the instrument needs to be polled per argument, these should be the commands to do so e.g Teledyne/Thermo
+   // if the instrument is sent one command and returns many fields e.g ICAD, then these should name the fields returned
+   // these will then have spaces and '?' characters stripped and will be used in channel name creation
+   function getParamNames()
+      switch
+         case(instrumentType == "t101")
+            return({"SO2", "SAMPFLOW", "SAMPPRESS", "PMTDET","UVDET","LAMPRATIO", "SO2SLOPE", "SO2OFFSET", "H2S","H2SSLOPE","H2SOFFSET", "HVPS", "RCELLTEMP", "BOXTEMP","PMTTEMP", "CONVTEMP"})
+            
+         case(instrumentType == "t100u")	
+            return({"SO2", "SAMPFLOW", "SAMPPRESS", "PMTDET","UVDET","LAMPRATIO", "SLOPE", "OFFSET", "HVPS", "RCELLTEMP", "BOXTEMP","PMTTEMP"})
+      
+         case(instrumentType == "al5002")
+            return({"CONC?", "SIG?", "ZERO?", "SENS?","TEMP? M","TEMP? L","TEMP? C","PRESS? L", "PRESS? C", "PRESS? F", "FLOW? M", "FLOW? L"})
+      
+         case(instrumentType  == "t200up")
+            return({"NO", "NO2", "NOX", "SAMPPRESS", "SAMPFLOW","OZONEFLOW", "HVPS", "RCELLTEMP", "BOXTEMP", "PMTTEMP", "CONVTEMP", "RCELLPRESS", "NOSLOPE", "NOOFFSET", "NOXSLOPE", "NOXOFFSET"})
+
+         case(instrumentType == "thermo49i")
+            return({"O3", "BENCH TEMP", "FLOW A", "FLOW B", "LAMP TEMP", "PRES"})
+      
+         case(instrumentType == "thermo43i")
+            return({"SO2", "gas mode", "conv temp", "flow", "internal temp", "pmt voltage", "pres", "react temp"})
+            
+         case(instrumentType == "aqguard")
+            return({"0", "1", "2", "3", "4", "5", "6", "23", "24", "26", "27", "35", "36", "40", "41", "47", "50", "51", "60", "61", "62", "63", "64", "65"})
+      
+         case(instrumentType == "aqguardBins")
+            return({"110", "111", "112", "113", "114", "115", "116", "117", "118", "119", "120", "121", "123", "124", "125", "126", "127", "128", "129", "130", "131", "132", "133", "134", "135", "136", "137", "138", "139", "140", "141", "142", "143", "144", "145", "146", "147", "148", "149", "150", "151", "152", "153", "154", "155", "156", "157", "158", "159", "160", "161", "162", "163", "164", "165", "166", "167", "168", "169", "170", "171", "172", "173"})
+            
+         case(instrumentType == "t300u")
+            return({"CO", "COMEAS","COREF", "MRRATIO", "SAMPPRESS", "SAMPFLOW", "BENCHTEMP","WHEELTEMP","OVENTEMP","COSLOPE", "COOFFSET","STABILITY"})
+            
+         case(instrumentType == "t500u")
+            return({"NO2", "PHASE", "SAMPPRESS","SAMPTEMP","BOXTEMP","SLOPE","OFFSET","STABILITY","AUTOREF","OVENTEMP"})
+            
+         case(instrumentType == "thermo450i")
+            return({"SO2", "H2S", "CONV TEMP", "FLOW","INTERNAL TEMP", "PMT VOLTAGE", "PRES", "REACT TEMP"})
+
+         case(instrumentType == "thermo42C")
+            return({"NO","PRES","SAMPLE FLOW","OZONATOR FLOW","REACT TEMP","PMT TEMP","PMT VOLTAGE","CONV TEMP"})
+            
+         case(instrumentType == "thermo42i")
+            return({"NO","NO2","NOX","PRES","SAMPLE FLOW","OZONATOR FLOW","REACT TEMP","PMT TEMP","PMT VOLTAGE","CONV TEMP"})
+         
+         case(instrumentType == "ht8700e")
+            private string paramNames1 = {"dataPacket","nh3Mix","nh3Mass","intHum","intTemp","ambTemp","ambPress","oss","peakPos","laserChipTemp","laserHouseTemp"}
+            private string paramNames2 = {"mctTemp","mctHouseTemp","laserCurrent","refCellSig2f","alarmLower","alarmUpper","cleaningFlag"}
+            return(Concat(paramNames1, paramNames2))
+            
+         case(instrumentType == "icad200de")
+            private string paramNames1 = {"no2vmr","noxvmr","novmr","no2vmre","noxvmre","novmre","t0","t2","p","tp","tsam","rds","co2vmr","pcell1","pcell2","sv","ftotal","fo3","int1","int2","ssch1","ssch2"}
+            private string paramNames2 = {"no2conv","timeoffset1","timeoffset2","timesincezero1","timesincezero2","measurmentstate","measurementsubstate","honovmr","honovmre","glyoxalvmr","glyoxalvmre"}
+            private string paramNames3 = {"oxvmr","oxvmre","o3vmr","o3vmre"}
+            return(Concat(Concat(paramNames1,paramNames2),paramNames3))
+            
+         case(instrumentType == "ethanetildas")
+            return({"timestamp","ethane","methane","water","boxtemp","cellpressure"})
+            
+         case(instrumentType == "gpsr" | instrumentType == "gpsl")
+            private string paramNames1 = {"rmctime","rmcstatus", "rmclat", "rmclatdir", "rmclon", "rmclondir", "rmcspdOvrGnd","rmccourseOvrGnd","rmcdate","rmcmagvar"} // rmc
+            private string paramNames2 = {"ggatime","ggalat", "ggalatdir", "ggalon","ggalondir", "ggafixtype", "ggansat","ggahdop", "ggaheight","ggaheightm", "ggageoidheight","ggageoidheightm","ggacorrage"} // gga
+            private string paramNames3 = {"hdmhead", "hdghead"}
+            
+            if(instrumentType == "gpsr")
+               return(Concat(paramNames1, paramNames2))
+            else
+               return(Concat(paramNames1, Concat(paramNames2, paramNames3)))
+            endif
+         
+         case(instrumentType == "gla131")
+            private string paramNames1 = {"timestamp", "ch4ppm", "ch4ppmsd", "co2ppm","co2ppmsd","h2oppm","h2oppmsd", "ch4dppm","ch4dppmsd","co2dppm"}
+            private string paramNames2 = {"co2dppmsd","gasptorr", "gasptorrsd","gastc","gastcsd","ambtc","ambtcsd","rd0us","rd0ussd","rd1us","rd1ussd"}
+            private string paramNames3 = {"rd0rawus","ltc0v", "ltc0vsd", "ltc1v","ltc1vsd","Hz","Hzsd","battv","battvsd","battperc","battpercsd","tempstatusma"}
+            private string paramNames4 = {"analyserstatusma","fitflag","miuvalve","miudesc"}
+            return(Concat(Concat(Concat(paramNames1,paramNames2),paramNames3), paramNames4))
+            //return({"timestamp", "ch4ppm", "ch4ppmsd", "co2ppm","co2ppmsd", })
+           
+         case(instrumentType == "windsonic")
+            return({"winddir","windspeed"})
+            
+         case(instrumentType == "tsi4000")
+            return({"flow","temp","press"})
+               
+         case(instrumentType == "aeris_co_n2o")
+            private string paramNames1 = {"timestamp","inletNumber","pressMbar","t0Degc","t1Degc","t2Degc","t5Degc","tgasDegc","laserPid","detectorPid"}
+            private string paramNames2 = {"win0Fit0","win0Fit1","win0Fit2","win0Fit3","win0Fit4","win0Fit5","win0Fit6","win0Fit7","win0Fit8","win0Fit9"}
+            private string paramNames3 = {"win1Fit0","win1Fit1","win1Fit2","win1Fit3","win1Fit4","win1Fit5","win1Fit6","win1Fit7","win1Fit8","win1Fit9"}
+            private string paramNames4 = {"detectorBackground","rampAmp1","n2oWetPpm","n2oDryPpm","h2oPpm","coWetPpm","coDryPpm","powerInputMv","tFetDegc"}
+            private string paramNames5 = {"tTecDegc","tTecSinkDegC","TecPowerW","wallCode","gpsTime","lat","lon","alt"}
+            return(Concat(Concat(Concat(Concat(paramNames1, paramNames2), paramNames3), paramNames4),paramNames5))
+            
+         case(instrumentType == "picarro_g2401")
+            return({"unixtime","co2Wet","ch4Wet","coDry","h2o","date","time"})
+
+            
+      endcase
+    
+   endfunction
+   
+   function buildChannelNames()
+      
+      if(IsEmpty(serialNumber))
+         throw("Please set serialNumber via setSerialNumber() before creating channels")
+      endif
+      
+      // tidy paramNames so they can work as channel names
+      private string myMessages = remove(paramNames," ")
+      myMessages = remove(myMessages, "?")
+   
+      for(private i = 0, i < numRows(myMessages), i++)
+         channelNames[i] = instrumentType+"_"+serialNumber+"_"+myMessages[i]
+      endfor
+   endfunction
+   
+   function createChannels()
+      if(IsEmpty(instrumentName))
+         throw("Please set instrumentName via setInstrumentName before creating channels")
+      endif
+      
+      buildChannelNames()
+      for(private i = 0, i < numRows(channelNames), i++)
+         channel.Add(channelNames[i],"test", 1, "A to D", 0,0,0,"",instrumentName)
+         execute(channelNames[i]+".HistoryLength = historyLength")
+      endfor
+      
+   endfunction
+   
+   
+endclass
+
+// ### Polling
+class pollingInstrument parent instrument
+   
+   local string messageStart
+   
+   function setMessageStart(string strIn)
+      messageStart = strIn
+   endfunction
+   
+   // general version of getAll() - loops over all messages and passes them to parseResponse before adding to channel
+   function getAll()
+
+      private string thisMessage 
+      private string thisResponse
+      private responseParsed
+      
+      if(IsEmpty(messageStart))
+         throw("Polling instruments require messageStart to be set via setMessageStart()")
+      endif
+      
+       for(private i = 0, i < numRows(paramNames), i++)
+            try 
+               thisMessage = messageStart+paramNames[i]+chr(13)
+               thisResponse = Poll(thisMessage, 13)
+               responseParsed = parseResponse(thisResponse, inst, i)
+               execute(channelNames[i]+".AddValue(responseParsed)")
+            catch()
+               execute(channelNames[i]+".AddValue(1/0)")
+            endcatch
+			
+			delay(0.4)
+       
+         endfor
+   endfunction
+   
+endclass
+
+class teledyne parent pollingInstrument
+   
+   function onCreate()
+      setMessageStart("T ")
+   endfunction
+   
+   // parseResponse for Teledyne instruments, splits on the "=" and takes the value after it, followed by spliting on space and taking the 1st element
+   // need to port the message checking code here
+   // t200up has the "O3GEN FL" or "OZONE FL" issue that also needs including - if(instrumentType == "t200up") is probably fine
+   function parseResponse(string response) 
+   
+      private responseParsed      
+      responseParsed = strToDouble(parse(parse(response, 1, "="), 0, " "))
+      return(responseParsed)
+   endfunction
+endclass
+
+class thermo parent pollingInstrument
+   
+   function onCreate()
+      setMessageStart("")
+   endfunction
+   
+   //parseResponse for Thermo instruments - split on space and take the 2nd element, unless thats a NaN when coherced to double, in which case take the 3rd
+   function parseResponse(string response) 
+      
+      private responseParsed
+		responseParsed = strToDouble(parse(response, 1, " "))
+      
+		if(responseParsed == NaN())
+			responseParsed = strToDouble(parse(response, 2, " "))
+		endif
+  
+      return(responseParsed)
+   endfunction
+endclass
+
+class aerolaser parent pollingInstrument
+   
+   function onCreate()
+      setMessageStart("")
+   endfunction
+   
+   //parseResponse for aerolaser instruments - strToDouble only
+   function parseResponse(string response) 
+      
+      private responseParsed
+		responseParsed = strToDouble(response)
+  
+      return(responseParsed)
+   endfunction
+endclass
+
+// palas class here
+
+// teledyne children
+class t200up parent teledyne
+   
+   function onCreate()
+      setInstrumentType("t200up")
+   endfunction
+   
+endclass
+
+class t101 parent teledyne
+   
+   function onCreate()
+      setInstrumentType("t101")
+   endfunction
+   
+endclass
+
+class t100u parent teledyne
+   
+   function onCreate()
+      setInstrumentType("t100u")
+   endfunction
+   
+endclass
+
+class t300u parent teledyne
+   
+   function onCreate()
+      setInstrumentType("t300u")
+   endfunction
+   
+endclass
+
+class t500u parent teledyne
+   
+   function onCreate()
+      setInstrumentType("t500u")
+   endfunction
+   
+endclass
+
+// thermo children
+
+class thermo49i parent thermo
+   
+   function onCreate()
+      setInstrumentType("thermo49i")
+   endfunction
+   
+endclass
+
+class thermo43i parent thermo
+   
+   function onCreate()
+      setInstrumentType("thermo43i")
+   endfunction
+   
+endclass
+
+class thermo450i parent thermo
+   
+   function onCreate()
+      setInstrumentType("thermo450i")
+   endfunction
+   
+endclass
+
+class thermo42c parent thermo
+   
+   function onCreate()
+      setInstrumentType("thermo42C")
+   endfunction
+   
+endclass
+
+class thermo42i parent thermo
+   
+   function onCreate()
+      setInstrumentType("thermo42i")
+   endfunction
+   
+endclass
+
+// aerolaser children
+
+class al5002 parent aerolaser
+   function onCreate()
+      setInstrumentType("al5002")
+   endfunction
+endclass
+
+// palas children
+// (aqguard)
+
+// #### Bayern-Hessen
+class bayernHessenInstrument parent instrument
+   
+   local string message
+   
+   function setMessage(string strIn)
+      message = strIn
+   endfunction
+   
+endclass
+
+class airyx parent bayernHessenInstrument
+   
+   // parseResponse for airyx instrument - bayern-hessen message contains multiple fields
+   // returns an array that getAll() can then assign to channels
+   
+   function onCreate()
+      setMessage(chr(2)+"DA"+chr(3)+"04")
+   endfunction
+   
+   function parseResponse() 
+      delay(0.5)
+      try
+         private string stx = Read(1) // start bit
+         private string md = Read(2) // token
+         private nn = Read(3) // number of measurements
+         private width = 7 // array dimention
+         private returnArray = fill(-1, nn*width)
+         
+         for(private i = 0, i < nn, i++)
+            private string nnn = Read(4)
+            private valNum = Read(5)
+            private string valExpStr = Read(3)
+            private valExp = strToDouble(valExpStr)-3 // fix exponent
+            private sink = Read(1) // sink hash
+            //private val = valNum * (10^valExp)
+            private string status = Read(3)
+            private string error = Read(3)
+            private string serial = Read(4)
+            private string hhhhhh = Read(7)
+            
+            returnArray[(width*i)] = nnn
+            returnArray[(width*i)+1] = valNum
+            returnArray[(width*i)+2] = valExp
+            returnArray[(width*i)+3] = status
+            returnArray[(width*i)+4] = error
+            returnArray[(width*i)+5] = serial
+            returnArray[(width*i)+6] = hhhhhh
+
+         endfor
+         sink = read(3)
+
+         if(nn >= 24)
+            private nestArray = parseResponse()
+            returnArray = Concat(Flatten(returnArray), Flatten(nestArray))
+         endif
+         
+         returnArray = unflatten(returnArray, width)
+         return(returnArray)
+      catch()
+         return(NULL)
+      endcatch
+   endfunction
+endclass
+
+class icad200de parent airyx
+   
+   function onCreate()
+      setInstrumentType("icad200de")
+   endfunction
+   
+   // getAll for icad200de - I think this needs to be instrument level so we know what channels match what IDs
+   function getAll()
+      
+      private response
+      
+      if(IsEmpty(message))
+         throw("Bayern-Hessen instruments require message to be set via setMessage()")
+      endif
+      
+      Purge()
+      Write(message)
+      response = parseResponse()
+      if(!IsEmpty(response))
+         for(private i = 0, i < numRows(response), i++)
+            
+            private messageId = response[i][0]
+            private val = response[i][1]*(10^response[i][2])
+            try
+               execute(channelNames[messageId]+".AddValue(val)")
+            catch()
+               execute(channelNames[messageId]+".AddValue(1/0)")
+            endcatch
+         endfor
+      endif
+   endfunction
+endclass
+
+// ### Streaming
+
+class streamingInstrument parent instrument
+   // only here right now to match polling/bayern-hessen structure
+endclass
+
+class tech2b parent streamingInstrument
+   function log()
+      private string response = ""
+      private responseParsed
+      
+      try // catch timeouts
+         response = readUntil(13)
+      catch()
+      endcatch
+      
+      if(!IsEmpty(response)) // did we get a response?
+         response = parse(response, -1, ",")
+         
+         for(private i = 0, i < 4, i++)
+            try
+               responseParsed = strToDouble(response[i])
+               execute(channelNames[i]+".addValue(responseParsed)")
+            catch()
+               execute(channelNames[i]+".addValue(1/0)")
+            endcatch
+         endfor
+      endif
+   endfunction
+   
+endclass
+
+class healthyPhoton parent streamingInstrument
+   
+   function log()
+      private string response = ""
+      private responseParsed
+      
+      try // catch timeouts
+         response = readUntil(13)
+      catch()
+      endcatch
+      
+      if(!IsEmpty(response)) // did we get a response?
+         response = parse(response, -1, ",")
+         // sometimes it sends a weird message with no commas, so we check if there are enough values
+         // there is one more element in the response (reserved 0000 at the end of the message), so we add 1 to numRows(channelNames)
+         if(numRows(response) == numRows(channelNames)+1) 
+            for(private i = 0, i < numRows(channelNames), i++) 
+               
+               if(paramNames[i] == "alarmLower" | paramNames[i] == "alarmUpper")
+                  responseParsed = strToDouble("0x"+response[i])
+               else
+                  responseParsed = strToDouble(response[i])
+               endif
+               try
+                  execute(channelNames[i]+".addValue(responseParsed)")
+               catch()
+                  execute(channelNames[i]+".addValue(1/0)")
+               endcatch
+               
+            endfor
+         endif
+      endif
+      
+   endfunction
+   
+endclass
+
+class aerodyne parent streamingInstrument
+   
+endclass
+
+class lgr_gga parent streamingInstrument
+   
+   function log()
+      private string response
+      try
+         response = readUntil(13)
+      catch()
+         response = NULL
+      endcatch
+      
+      if(!IsEmpty(response)) // did we get a response?
+         response = parse(response, -1, ",")
+         if(numRows(response) == numRows(paramNames))
+            for(private i = 0, i < numRows(channelNames), i++)
+               if(i == 0 | i == 36)
+                  private string responseParsedString = response[i]
+                  try
+                     execute(channelNames[i]+".addValue(responseParsedString)")
+                  catch()
+                     execute(channelNames[i]+".addValue(1/0)")
+                  endcatch
+               else
+                  private responseParsed = strToDouble(response[i])
+                  try
+                     execute(channelNames[i]+".addValue(responseParsed)")
+                  catch()
+                     execute(channelNames[i]+".addValue(1/0)")
+                  endcatch()
+               endif
+            endfor
+         endif
+      endif
+   endfunction
+   
+endclass
+
+class aeris_co_n2o parent streamingInstrument
+   
+   function onCreate()
+      setInstrumentType("aeris_co_n2o")
+   endfunction
+   
+   function log()
+      private string response
+      try
+         response = readUntil(13)
+      catch()
+         response = NULL
+      endcatch
+      
+      if(!IsEmpty(response)) // did we get a response?
+         response = parse(response, -1, ",")
+         if(numRows(response) == numRows(paramNames))
+            for(private i = 0, i < numRows(channelNames), i++)
+               if(i == 0)
+                  private string responseParsedString = response[i]
+                  try
+                     execute(channelNames[i]+".addValue(responseParsedString)")
+                  catch()
+                     execute(channelNames[i]+".addValue(1/0)")
+                  endcatch
+               else
+                  private responseParsed = strToDouble(response[i])
+                  try
+                     execute(channelNames[i]+".addValue(responseParsed)")
+                  catch()
+                     execute(channelNames[i]+".addValue(1/0)")
+                  endcatch()
+               endif
+            endfor
+         endif
+      endif
+      
+   endfunction
+   
+endclass
+
+class picarro_g2401 parent streamingInstrument
+   function onCreate()
+      setInstrumentType("picarro_g2401")
+   endfunction
+   
+   function log()
+      private string response
+      try
+         response = readUntil(13)
+      catch()
+         response = NULL
+      endcatch
+      
+      if(!IsEmpty(response)) // did we get a response?
+         response = HideHidden(response) // remove the extra CRLFs
+         // I think the response is fixed width (but different width per column) but I'm being lazy and 
+         // just splitting on " " and then removing elements of the array containing ""
+         private string bigArray = parse(response, -1, " ")
+         private string littleArray = Fill("", numRows(paramNames))
+         
+         private counter = 0
+         for(private i = 0, i < numRows(bigArray), i++)
+            if(bigArray[i] != "")
+               littleArray[counter] = bigArray[i]
+               counter++
+            endif
+         endfor
+
+         for(private i = 0, i < numRows(channelNames), i++)
+            private responseParsed = strToDouble(littleArray[i])
+            try
+               execute(channelNames[i]+".addValue(responseParsed)")
+            catch()
+               execute(channelNames[i]+".addValue(1/0)")
+            endcatch()
+         endfor
+      endif
+      
+   endfunction
+
+endclass
+   
+
+// tech2b children
+
+class o32b parent tech2b
+   
+   function onCreate()
+      setInstrumentType("o32b")
+   endfunction
+   
+endClass
+
+// healthyPhoton children
+
+class ht8700e parent healthyPhoton
+   function onCreate()
+      setInstrumentType("ht8700e")
+   endfunction
+endclass
+
+// aerodyne children
+class ethanetildas parent aerodyne
+   function onCreate()
+      setInstrumentType("ethanetildas")
+   endfunction
+   
+   function log()
+      
+      private string response
+      private responseParsed
+      private string sink   
+   
+      try // catch timeouts
+         purge()
+         sink = readUntil(13)
+      catch()
+      endcatch
+      
+      try
+         delay(0.09)
+         response = readUntil(13)
+      catch()
+         response = NULL
+      endcatch
+      
+      if(!IsEmpty(response)) // did we get a response?
+         response = parse(response, -1, ",")
+         if(numRows(response) != 11) // if we don't get a full message try one more read
+            try
+               response = readUntil(13)
+               response = parse(response, -1, ",")
+            catch()
+               response = NULL
+            endcatch
+         endif
+         
+         if(numRows(response) == 11)
+            private index = {0,1,2,3,9,10} // to skip the missing fields
+            for(private i = 0, i < numRows(index), i++)
+               try
+                  responseParsed = strToDouble(response[index[i]])
+                  execute(channelNames[i]+".addValue(responseParsed)")
+               catch()
+                  ?i
+                  execute(channelNames[i]+".addValue(1/0)")
+               endcatch
+            endfor
+         endif
+      endif
+   endfunction
+endclass
+
+   // lgr
+class gla131 parent lgr_gga
+   function onCreate()
+      setInstrumentType("gla131")
+   endfunction
+   
+endclass
+
+
+// nmea
+class nmea parent streamingInstrument
+   
+   local nMessages
+   
+   function log()
+      
+      private string response
+      private string responseParsed
+      private string head 
+      
+      try
+         response = readUntil(13)
+      catch()
+         response = null
+      endcatch
+      
+      if(!IsEmpty(response)) // did we get a response?
+         response = parse(response, -1, ",")
+         head = right(response[0], 3) // first letters correspond to satellite type - right 3 are NMEA sentence definition
+         switch
+            case(head == "RMC")
+               if(instrumentType == "gpsl")
+                  private rmcMax = numRows(response)-2 // the gpsl has an extra field on its RMC sentence... why!
+               else
+                  private rmcMax = numRows(response)-1
+               endif
+               
+               for(private i = 1, i < rmcMax, i++)
+                  private channelIndex = i-1
+                  if(i == 2 | i == 4 | i == 6)
+                     responseParsed = response[i]
+                  else
+                     responseParsed = strToDouble(response[i])
+                  endif
+
+                  try
+                     execute(channelNames[channelIndex]+".addValue(responseParsed)")
+                  catch()
+                     execute(channelNames[channelIndex]+".addValue(1/0)")
+                  endcatch
+               endfor
+           
+            case(head == "GGA")
+               for(private i = 1, i < numRows(response)-1, i++)
+                  private channelIndex = i+9
+                  if(i == 3 | i == 5 | i == 10 | i == 12)
+                     responseParsed = response[i]
+                  else
+                     responseParsed = strToDouble(response[i])
+                  endif
+
+                  try
+                     execute(channelNames[channelIndex]+".addValue(responseParsed)")
+                  catch()
+                     execute(channelNames[channelIndex]+".addValue(1/0)")
+                  endcatch
+               endfor
+               
+            case(head == "HDM")
+               responseParsed = strToDouble(response[1])
+               try
+                  execute(channelNames[23]+".addValue(responseParsed)")
+               catch()
+                  execute(channelNames[23]+".addValue(1/0)")
+               endcatch
+            case(head == "HDG")
+               responseParsed = strToDouble(response[1])
+               try
+                  execute(channelNames[24]+".addValue(responseParsed)")
+               catch()
+                  execute(channelNames[24]+".addValue(1/0)")
+               endcatch
+         endcase
+      endif
+   endfunction
+endclass
+
+class gpsr parent nmea
+   
+   function onCreate()
+      setInstrumentType("gpsr")
+      nMessages = 6
+   endfunction
+   
+endclass
+
+class gpsl parent nmea
+   function onCreate()
+      setInstrumentType("gpsl")
+   endfunction
+   
+endclass
+
+class windsonic parent streamingInstrument
+   
+   function onCreate()
+      setInstrumentType("windsonic")
+   endfunction
+   
+   function log()
+   
+      private string response
+      private string responseParsed
+      
+      try // catch timeouts
+         response = readUntil(13)
+      catch()
+      endcatch
+      
+      if(!IsEmpty(response))
+         response = parse(response,-1, ",")
+         for(private i = 1, i < 3, i++)
+         responseParsed = strToDouble(response[i])
+            try
+               execute(channelNames[i-1]+".addValue(responseParsed)")
+            catch()
+               execute(channelNames[i-1]+".addValue(1/0)")
+            endcatch
+         endfor
+      endif
+   endfunction
+endclass
+
+class TSI4000 parent pollingInstrument
+   function onCreate()
+      setInstrumentType("tsi4000")
+   endfunction
+   
+   function getSerialNumber()
+      purge()
+      write("SN"+chr(013))
+      private string sink = readUntil(13)
+      private string sn = readUntil(13)
+      return(sn)
+   endfunction
+   
+   function Poll(string out, until)
+      // this function will poll the port with given string and read
+      // the response until the given character.  Returns NULL (empty)
+      // if there is an error
+      if (argc < 2)
+         throw("Invalid number of parameters")
+      endif
+      
+      private string in
+      try
+         // lock the port
+         if (!PortOb.LockPort())
+            throw("Unable to lock port")
+         endif
+         // clear anything pending
+         PortOb.Purge()
+         // output our string
+         PortOb.Write(out)
+         ReadUntil(until) // skip affirm
+         // and read until the eol:
+         
+         in = ReadUntil(until) 
+         // release the port
+         PortOb.UnlockPort()
+         // and return the response
+         return(in)
+      catch()
+         // error occured
+         PortOb.UnlockPort()
+         throw()
+      endcatch
+      // return NULL to indicate error.  This should never happen
+      // because of the throw() statement above
+      return(NULL)
+   endfunction
+   
+   
+   function log()
+      private string response 
+      
+      try
+         response = poll("DAFTP0001"+chr(13),13)
+      catch()
+         response = null
+      endcatch
+      
+      if(!isEmpty(response))
+         response = parse(response, -1, ",")
+      
+         for(private i = 0, i < numRows(channelNames), i++)
+               private responseParsed = strToDouble(response[i])
+            try
+               execute(channelNames[i]+".addValue(responseParsed)")
+            catch()
+               execute(channelNames[i]+".addValue(1/0)")
+            endcatch
+         endfor
+      endif
+      
+   endfunction
+   
+endclass
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.init, Priority: 1
+
+class_instrument()
+
+channel.ClearAll()
+
+// create instruments
+// O3_3 
+global O3_3 = new(thermo49i)
+O3_3.initTCP("192.168.1.19",9880,1000)
+O3_3.setInstrumentName("O3_3")
+O3_3.setSerialNumber("708621224")
+O3_3.createChannels()
+
+// O3_4
+global O3_4 = new(thermo49i)
+O3_4.initTCP("192.168.1.20",9880,1000)
+O3_4.setInstrumentName("O3_4")
+O3_4.setSerialNumber("730525419")
+O3_4.createChannels()
+
+// O3_5 
+global O3_5 = new(thermo49i)
+O3_5.initTCP("10.49.86.227",9880,1000)
+O3_5.setInstrumentName("O3_5")
+O3_5.setSerialNumber("1008241369")
+O3_5.createChannels()
+
+// O3_10
+global O3_10 = new(thermo49i)
+O3_10.initTCP("10.49.86.226",9880,1000)
+O3_10.setInstrumentName("O3_10")
+O3_10.setSerialNumber("1152780003")
+O3_10.createChannels()
+
+// CO_5
+global CO_5 = new(aeris_co_n2o)
+CO_5.initTCP("10.49.86.225",9001,1000)
+CO_5.setInstrumentName("CO_5")
+CO_5.setSerialNumber("100861")
+CO_5.createChannels()
+
+// picarro_1
+global picarro_1 = new(picarro_g2401)
+picarro_1.initTCP("10.49.86.222",9001,1000)
+picarro_1.setInstrumentName("picarro_1")
+picarro_1.setSerialNumber("2190CFKADS2179")
+picarro_1.createChannels()
+
+
+// SO2_6
+global SO2_6 = new(thermo43i)
+SO2_6.initTCP("10.49.86.223",9880,1000) // check port and update cozi_instruments
+SO2_6.setInstrumentName("SO2_6")
+SO2_6.setSerialNumber("1152780003")
+SO2_6.createChannels()
+
+// SO2 Cal control
+// these were Dig Out on the previous software, but that casued an, so swapped to Dig In as thats how the LJ is configured
+// Need to check that it is actually doing the cal stuff
+channel.Add("CAL1", "LabJackUD", 3, "Dig In", 10,0,0,"","SO2_6")
+channel.Add("CAL2", "LabJackUD", 3, "Dig In", 8 ,0,0,"","SO2_6")
+channel.Add("CAL_CONTROL", "LabJackUD", 3, "Dig In", 11,0,0,"","SO2_6")
+
+
+
+
+// graphing controls
+global scaleSO2y = 20
+
+global scaleO3y = 50
+
+global scaleCOyMin = 0.06
+global scaleCOyMax = 0.1
+
+global scaleN2OyMin = 0.3
+global scaleN2OyMax = 0.4
+
+global scaleCO2yMin = 414
+global scaleCO2yMax = 418
+
+global scaleCH4yMin = 1.93
+global scaleCH4yMax = 1.96
+
+global scaleX = 3600
+
+// logging paths
+
+global string fpRoot = "C:/backup_data/cvao_logger/"
+
+if(!File.GetFileExists(fpRoot))
+   throw("Cannot initialse - root folder does not exist")
+endif
+
+global string fpAll = fpRoot+"all_data/"
+global string fpAllO3  = fpRoot+"all_o3/"
+
+global string fpO3_3  = fpRoot+"O3_Thermo_49i_"+O3_3.serialNumber+"/"
+global string fpO3_4  = fpRoot+"O3_Thermo_49i_"+O3_4.serialNumber+"/"
+global string fpO3_5  = fpRoot+"O3_Thermo_49i_"+O3_5.serialNumber+"/"
+global string fpO3_10 = fpRoot+"O3_Thermo_49i_"+O3_10.serialNumber+"/"
+
+global string fpSO2_6 = fpRoot+"SO2_Thermo_43i_"+SO2_6.serialNumber+"/"
+
+global string fpCO_5  = fpRoot+"CO_AERIS_Ultra_"+CO_5.serialNumber+"/"
+
+global string fpPicarro_1  = fpRoot+"CO2-CO-CH4-H2O_picarro_g2401_"+picarro_1.serialNumber+"/"
+
+global string fpArray = Concat(Concat(Concat(Concat(Concat(Concat(Concat(Concat(fpAll, fpAllO3), fpO3_3),fpO3_4), fpO3_5), fpO3_10),fpSO2_6),fpCO_5),fpPicarro_1)
+
+// begin
+
+beginseq(aquire_CO_5)
+beginseq(aquire_O3_3)
+beginseq(aquire_O3_4)
+beginseq(aquire_O3_5)
+beginseq(aquire_O3_10)
+beginseq(aquire_SO2_6)
+beginseq(aquire_picarro_1)
+
+beginseq(manageFolders)
+
+delay(1)
+
+beginseq(log_all)
+beginseq(log_all_O3)
+beginseq(log_CO_5)
+beginseq(log_O3_3)
+beginseq(log_O3_4)
+beginseq(log_O3_5)
+beginseq(log_O3_10)
+beginseq(log_SO2_6)
+beginseq(log_picarro_1)
+
+delay(2) // try to make the initial valve states log
+
+beginseq(so2_air)
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.log_CO_5, Priority: 3 - Logging
+
+// On first setup
+// Make an empty loggingSet in the UI called `CO_5`
+// Set to fixed interval and define averaging period
+
+private string allChannelNames = channel.ListAll("CO_5")
+private string prefix = "CO_5_"
+private string fp = fpCO_5
+
+for(private i = 0, i < numRows(allChannelNames), i++)
+   logging.CO_5.AddChannel(allChannelNames[i])
+endfor
+
+logging.CO_5.strLoggingMethod = "ASCII Delimited"
+logging.CO_5.strDelimiter = ","
+logging.CO_5.strFileName = fp+FormatDateTime("%Y",SysTime())+"/"+FormatDateTime("%m",SysTime())+"/"+prefix+FormatDateTime("%y%m%d_%H%M%S.csv",SysTime()) 
+
+logging.CO_5.Start()
+
+while(1)
+   
+   waituntil(0h+86400)
+   logging.CO_5.strFileName = fp+FormatDateTime("%Y",SysTime())+"/"+FormatDateTime("%m",SysTime())+"/"+prefix+FormatDateTime("%y%m%d_%H%M%S.csv",SysTime())
+   
+endwhile
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.log_O3_10, Priority: 3 - Logging
+
+// On first setup
+// Make an empty loggingSet in the UI called `O3_10`
+// Set to fixed interval and define averaging period
+
+private string allChannelNames = channel.ListAll("O3_10")
+private string prefix = "O3_10_"
+private string fp = fpO3_10
+
+for(private i = 0, i < numRows(allChannelNames), i++)
+   logging.O3_10.AddChannel(allChannelNames[i])
+endfor
+
+logging.O3_10.strLoggingMethod = "ASCII Delimited"
+logging.O3_10.strDelimiter = ","
+logging.O3_10.strFileName = fp+FormatDateTime("%Y",SysTime())+"/"+FormatDateTime("%m",SysTime())+"/"+prefix+FormatDateTime("%y%m%d_%H%M%S.csv",SysTime()) 
+
+logging.O3_10.Start()
+
+while(1)
+   
+   waituntil(0h+86400)
+   logging.O3_10.strFileName = fp+FormatDateTime("%Y",SysTime())+"/"+FormatDateTime("%m",SysTime())+"/"+prefix+FormatDateTime("%y%m%d_%H%M%S.csv",SysTime())
+   
+endwhile
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.log_O3_3, Priority: 3 - Logging
+
+// On first setup
+// Make an empty loggingSet in the UI called `O3_3`
+// Set to fixed interval and define averaging period
+
+private string allChannelNames = channel.ListAll("O3_3")
+private string prefix = "O3_3_"
+private string fp = fpO3_3
+
+for(private i = 0, i < numRows(allChannelNames), i++)
+   logging.O3_3.AddChannel(allChannelNames[i])
+endfor
+
+logging.O3_3.strLoggingMethod = "ASCII Delimited"
+logging.O3_3.strDelimiter = ","
+logging.O3_3.strFileName = fp+FormatDateTime("%Y",SysTime())+"/"+FormatDateTime("%m",SysTime())+"/"+prefix+FormatDateTime("%y%m%d_%H%M%S.csv",SysTime()) 
+
+logging.O3_3.Start()
+
+while(1)
+   
+   waituntil(0h+86400)
+   logging.O3_3.strFileName = fp+FormatDateTime("%Y",SysTime())+"/"+FormatDateTime("%m",SysTime())+"/"+prefix+FormatDateTime("%y%m%d_%H%M%S.csv",SysTime())
+   
+endwhile
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.log_O3_4, Priority: 3 - Logging
+
+// On first setup
+// Make an empty loggingSet in the UI called `O3_4`
+// Set to fixed interval and define averaging period
+
+private string allChannelNames = channel.ListAll("O3_4")
+private string prefix = "O3_4_"
+private string fp = fpO3_4
+
+for(private i = 0, i < numRows(allChannelNames), i++)
+   logging.O3_4.AddChannel(allChannelNames[i])
+endfor
+
+logging.O3_4.strLoggingMethod = "ASCII Delimited"
+logging.O3_4.strDelimiter = ","
+logging.O3_4.strFileName = fp+FormatDateTime("%Y",SysTime())+"/"+FormatDateTime("%m",SysTime())+"/"+prefix+FormatDateTime("%y%m%d_%H%M%S.csv",SysTime()) 
+
+logging.O3_4.Start()
+
+while(1)
+   
+   waituntil(0h+86400)
+   logging.O3_4.strFileName = fp+FormatDateTime("%Y",SysTime())+"/"+FormatDateTime("%m",SysTime())+"/"+prefix+FormatDateTime("%y%m%d_%H%M%S.csv",SysTime())
+   
+endwhile
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.log_O3_5, Priority: 3 - Logging
+
+// On first setup
+// Make an empty loggingSet in the UI called `O3_5`
+// Set to fixed interval and define averaging period
+
+private string allChannelNames = channel.ListAll("O3_5")
+private string prefix = "O3_5_"
+private string fp = fpO3_5
+
+for(private i = 0, i < numRows(allChannelNames), i++)
+   logging.O3_5.AddChannel(allChannelNames[i])
+endfor
+
+logging.O3_5.strLoggingMethod = "ASCII Delimited"
+logging.O3_5.strDelimiter = ","
+logging.O3_5.strFileName = fp+FormatDateTime("%Y",SysTime())+"/"+FormatDateTime("%m",SysTime())+"/"+prefix+FormatDateTime("%y%m%d_%H%M%S.csv",SysTime()) 
+
+logging.O3_5.Start()
+
+while(1)
+   
+   waituntil(0h+86400)
+   logging.O3_5.strFileName = fp+FormatDateTime("%Y",SysTime())+"/"+FormatDateTime("%m",SysTime())+"/"+prefix+FormatDateTime("%y%m%d_%H%M%S.csv",SysTime())
+   
+endwhile
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.log_SO2_6, Priority: 3 - Logging
+
+// On first setup
+// Make an empty loggingSet in the UI called `SO2_6`
+// Set to fixed interval and define averaging period
+
+private string allChannelNames = channel.ListAll("SO2_6")
+private string prefix = "SO2_6_"
+private string fp = fpSO2_6
+
+for(private i = 0, i < numRows(allChannelNames), i++)
+   logging.SO2_6.AddChannel(allChannelNames[i])
+endfor
+
+logging.SO2_6.strLoggingMethod = "ASCII Delimited"
+logging.SO2_6.strDelimiter = ","
+logging.SO2_6.strFileName = fp+FormatDateTime("%Y",SysTime())+"/"+FormatDateTime("%m",SysTime())+"/"+prefix+FormatDateTime("%y%m%d_%H%M%S.csv",SysTime()) 
+
+logging.SO2_6.Start()
+
+while(1)
+   
+   waituntil(0h+86400)
+   logging.SO2_6.strFileName = fp+FormatDateTime("%Y",SysTime())+"/"+FormatDateTime("%m",SysTime())+"/"+prefix+FormatDateTime("%y%m%d_%H%M%S.csv",SysTime())
+   
+endwhile
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.log_all, Priority: 3 - Logging
+
+// On first setup
+// Make an empty loggingSet in the UI called `allChannels`
+// Set to fixed interval and define averaging period
+
+private string allChannelNames = channel.ListAll()
+private string prefix = "all_data_"
+private string fp = fpAll
+
+for(private i = 0, i < numRows(allChannelNames), i++)
+   logging.allChannels.AddChannel(allChannelNames[i])
+endfor
+
+logging.allChannels.strLoggingMethod = "ASCII Delimited"
+logging.allChannels.strDelimiter = ","
+logging.allChannels.strFileName = fp+FormatDateTime("%Y",SysTime())+"/"+FormatDateTime("%m",SysTime())+"/"+prefix+FormatDateTime("%y%m%d_%H%M%S.csv",SysTime()) 
+
+logging.allChannels.Start()
+
+while(1)
+   
+   waituntil(0h+86400)
+   logging.allChannels.strFileName = fp+FormatDateTime("%Y",SysTime())+"/"+FormatDateTime("%m",SysTime())+"/"+prefix+FormatDateTime("%y%m%d_%H%M%S.csv",SysTime())
+   
+endwhile
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.log_all_O3, Priority: 3 - Logging
+
+// On first setup
+// Make an empty loggingSet in the UI called `allO3`
+// Set to fixed interval and define averaging period
+
+private string allChannelNames = {"thermo49i_708621224_O3","thermo49i_730525419_O3","thermo49i_1008241369_O3","thermo49i_1152780003_O3"}
+private string prefix = "all_o3_"
+private string fp = fpAllO3
+
+for(private i = 0, i < numRows(allChannelNames), i++)
+   logging.allO3.AddChannel(allChannelNames[i])
+endfor
+
+logging.allO3.strLoggingMethod = "ASCII Delimited"
+logging.allO3.strDelimiter = ","
+logging.allO3.strFileName = fp+FormatDateTime("%Y",SysTime())+"/"+FormatDateTime("%m",SysTime())+"/"+prefix+FormatDateTime("%y%m%d_%H%M%S.csv",SysTime()) 
+
+logging.allO3.Start()
+
+while(1)
+   
+   waituntil(0h+86400)
+   logging.allO3.strFileName = fp+FormatDateTime("%Y",SysTime())+"/"+FormatDateTime("%m",SysTime())+"/"+prefix+FormatDateTime("%y%m%d_%H%M%S.csv",SysTime())
+   
+endwhile
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.log_picarro_1, Priority: 3 - Logging
+
+// On first setup
+// Make an empty loggingSet in the UI called `picarro_1`
+// Set to fixed interval and define averaging period
+
+private string allChannelNames = channel.ListAll("picarro_1")
+private string prefix = "picarro_1_"
+private string fp = fpPicarro_1
+
+for(private i = 0, i < numRows(allChannelNames), i++)
+   logging.picarro_1.AddChannel(allChannelNames[i])
+endfor
+
+logging.picarro_1.strLoggingMethod = "ASCII Delimited"
+logging.picarro_1.strDelimiter = ","
+logging.picarro_1.strFileName = fp+FormatDateTime("%Y",SysTime())+"/"+FormatDateTime("%m",SysTime())+"/"+prefix+FormatDateTime("%y%m%d_%H%M%S.csv",SysTime()) 
+
+logging.picarro_1.Start()
+
+while(1)
+   
+   waituntil(0h+86400)
+   logging.picarro_1.strFileName = fp+FormatDateTime("%Y",SysTime())+"/"+FormatDateTime("%m",SysTime())+"/"+prefix+FormatDateTime("%y%m%d_%H%M%S.csv",SysTime())
+   
+endwhile
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.manageFolders, Priority: 3 - Logging
+
+// Every second, checks if the month/year is going to change in 10 secs
+// if it does, create the new folders to save the data into
+// I don't like that it has to check every second, but I'm not sure that can be changed without a big rewrite.
+
+// first run make the top level folders
+for(private i = 0, i < numRows(fpArray), i++)
+   if(!File.GetFileExists(fpArray[i])) 
+      File.MakeDirectory(fpArray[i])
+   endif
+endfor
+
+
+while(1)
+   
+   private nowPlus10 = SysTime()+10 // work ten secs into the future, so we can get the folder ready for the month change
+   
+   private string myYear = FormatDateTime("%Y",nowPlus10)
+   private string myMonth = FormatDateTime("%m",nowPlus10)
+
+   for(private i = 0, i < numRows(fpArray), i++)
+      if(!File.GetFileExists(fpArray[i]+myYear+"/"+mymonth)) // if the month folder doesn't exists
+         if(!File.GetFileExists(fpArray[i]+myYear)) // first check if the year folder exists
+            File.MakeDirectory(fpArray[i]+myYear) // if it doesn't, make it
+         endif
+      
+         File.MakeDirectory(fpArray[i]+myYear+"/"+mymonth) // secondly, make the month folder
+         
+      endif
+   endfor
+   
+   delay(1)   
+endwhile
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.so2_air, Priority: 5 - Acquisition
+
+while(1)
+   
+   CAL_CONTROL = 0
+   CAL1 = 0
+   
+   delay(1800)
+   
+   CAL_CONTROL = 1
+   
+   delay(1800)
+   
+endwhile
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~ Sequence.so2_cal, Priority: 5 - Acquisition
+
+CAL_CONTROL = 1
+CAL1 = 1
+   
+delay(12000)
+   
+CAL1 = 0
+CAL_CONTROL = 0
+   
+beginseq(so2_air)
+
