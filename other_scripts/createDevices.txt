@@ -1,0 +1,243 @@
+// O3_1
+global port_O3_1 = new(CCommEthernet)
+port_O3_1.Address = "192.168.1.17"
+port_O3_1.Port = 9001
+global O3_1 = new(CCommDevice)
+O3_1.PortObject = port_O3_1
+O3_1.ProtocolName = "wacl_cozi"
+
+
+// O3_2
+global port_O3_2 = new(CCommEthernet)
+port_O3_2.Address = "192.168.1.18"
+port_O3_2.Port = 9880
+global O3_2 = new(CCommDevice)
+O3_2.PortObject = port_O3_2
+O3_2.ProtocolName = "wacl_cozi"
+
+
+// O3_3
+global port_O3_3 = new(CCommEthernet)
+port_O3_3.Address = "192.168.1.19"
+port_O3_3.Port = 9880
+global O3_3 = new(CCommDevice)
+O3_3.PortObject = port_O3_3
+O3_3.ProtocolName = "wacl_cozi"
+
+
+// O3_4
+global port_O3_4 = new(CCommEthernet)
+port_O3_4.Address = "192.168.1.20"
+port_O3_4.Port = 9880
+global O3_4 = new(CCommDevice)
+O3_4.PortObject = port_O3_4
+O3_4.ProtocolName = "wacl_cozi"
+
+
+// O3_5
+global port_O3_5 = new(CCommEthernet)
+port_O3_5.Address = "192.168.1.21"
+port_O3_5.Port = 9880
+global O3_5 = new(CCommDevice)
+O3_5.PortObject = port_O3_5
+O3_5.ProtocolName = "wacl_cozi"
+
+
+// O3_8
+global port_O3_8 = new(CCommEthernet)
+port_O3_8.Address = "192.168.1.24"
+port_O3_8.Port = 9880
+global O3_8 = new(CCommDevice)
+O3_8.PortObject = port_O3_8
+O3_8.ProtocolName = "wacl_cozi"
+
+
+// O3_9
+global port_O3_9 = new(CCommEthernet)
+port_O3_9.Address = "192.168.1.25"
+port_O3_9.Port = 9880
+global O3_9 = new(CCommDevice)
+O3_9.PortObject = port_O3_9
+O3_9.ProtocolName = "wacl_cozi"
+
+
+// O3_10
+global port_O3_10 = new(CCommEthernet)
+port_O3_10.Address = "192.168.1.26"
+port_O3_10.Port = 9880
+global O3_10 = new(CCommDevice)
+O3_10.PortObject = port_O3_10
+O3_10.ProtocolName = "wacl_cozi"
+
+
+// O3_11
+global port_O3_11 = new(CCommEthernet)
+port_O3_11.Address = "192.168.1.27"
+port_O3_11.Port = 9880
+global O3_11 = new(CCommDevice)
+O3_11.PortObject = port_O3_11
+O3_11.ProtocolName = "wacl_cozi"
+
+
+// O3_12
+global port_O3_12 = new(CCommEthernet)
+port_O3_12.Address = "192.168.1.28"
+port_O3_12.Port = 9880
+global O3_12 = new(CCommDevice)
+O3_12.PortObject = port_O3_12
+O3_12.ProtocolName = "wacl_cozi"
+
+
+// CO_1
+global port_CO_1 = new(CCommEthernet)
+port_CO_1.Address = "192.168.1.109"
+port_CO_1.Port = 8000
+global CO_1 = new(CCommDevice)
+CO_1.PortObject = port_CO_1
+CO_1.ProtocolName = "wacl_cozi"
+
+
+// CO_2
+global port_CO_2 = new(CCommEthernet)
+port_CO_2.Address = "192.168.1.110"
+port_CO_2.Port = 8000
+global CO_2 = new(CCommDevice)
+CO_2.PortObject = port_CO_2
+CO_2.ProtocolName = "wacl_cozi"
+
+
+// CO_4
+global port_CO_4 = new(CCommEthernet)
+port_CO_4.Address = "192.168.1.112"
+port_CO_4.Port = 3000
+global CO_4 = new(CCommDevice)
+CO_4.PortObject = port_CO_4
+CO_4.ProtocolName = "wacl_cozi"
+
+
+// NO_1
+global port_NO_1 = new(CCommEthernet)
+port_NO_1.Address = "192.168.1.150"
+port_NO_1.Port = 9001
+global NO_1 = new(CCommDevice)
+NO_1.PortObject = port_NO_1
+NO_1.ProtocolName = "wacl_cozi"
+
+
+// NO2_1
+global port_NO2_1 = new(CCommEthernet)
+port_NO2_1.Address = "192.168.1.10"
+port_NO2_1.Port = 10009
+global NO2_1 = new(CCommDevice)
+NO2_1.PortObject = port_NO2_1
+NO2_1.ProtocolName = "wacl_cozi"
+
+
+// NO2_2
+global port_NO2_2 = new(CCommEthernet)
+port_NO2_2.Address = "192.168.1.11"
+port_NO2_2.Port = 10009
+global NO2_2 = new(CCommDevice)
+NO2_2.PortObject = port_NO2_2
+NO2_2.ProtocolName = "wacl_cozi"
+
+
+// NO2_3
+global port_NO2_3 = new(CCommEthernet)
+port_NO2_3.Address = "192.168.1.12"
+port_NO2_3.Port = 3000
+global NO2_3 = new(CCommDevice)
+NO2_3.PortObject = port_NO2_3
+NO2_3.ProtocolName = "wacl_cozi"
+
+
+// NOx_1
+global port_NOx_1 = new(CCommEthernet)
+port_NOx_1.Address = "192.168.1.154"
+port_NOx_1.Port = 3000
+global NOx_1 = new(CCommDevice)
+NOx_1.PortObject = port_NOx_1
+NOx_1.ProtocolName = "wacl_cozi"
+
+
+// NOx_2
+global port_NOx_2 = new(CCommEthernet)
+port_NOx_2.Address = "192.168.1.155"
+port_NOx_2.Port = 3000
+global NOx_2 = new(CCommDevice)
+NOx_2.PortObject = port_NOx_2
+NOx_2.ProtocolName = "wacl_cozi"
+
+
+// NOx_3
+global port_NOx_3 = new(CCommEthernet)
+port_NOx_3.Address = "192.168.1.156"
+port_NOx_3.Port = 3000
+global NOx_3 = new(CCommDevice)
+NOx_3.PortObject = port_NOx_3
+NOx_3.ProtocolName = "wacl_cozi"
+
+
+// NOx_4
+global port_NOx_4 = new(CCommEthernet)
+port_NOx_4.Address = "192.168.1.157"
+port_NOx_4.Port = 3000
+global NOx_4 = new(CCommDevice)
+NOx_4.PortObject = port_NOx_4
+NOx_4.ProtocolName = "wacl_cozi"
+
+
+// NOx_6
+global port_NOx_6 = new(CCommEthernet)
+port_NOx_6.Address = "192.168.1.159"
+port_NOx_6.Port = 9880
+global NOx_6 = new(CCommDevice)
+NOx_6.PortObject = port_NOx_6
+NOx_6.ProtocolName = "wacl_cozi"
+
+
+// SO2_1
+global port_SO2_1 = new(CCommEthernet)
+port_SO2_1.Address = "192.168.1.160"
+port_SO2_1.Port = 9880
+global SO2_1 = new(CCommDevice)
+SO2_1.PortObject = port_SO2_1
+SO2_1.ProtocolName = "wacl_cozi"
+
+
+// SO2_2
+global port_SO2_2 = new(CCommEthernet)
+port_SO2_2.Address = "192.168.1.200"
+port_SO2_2.Port = 9880
+global SO2_2 = new(CCommDevice)
+SO2_2.PortObject = port_SO2_2
+SO2_2.ProtocolName = "wacl_cozi"
+
+
+// SO2_3
+global port_SO2_3 = new(CCommEthernet)
+port_SO2_3.Address = "192.168.1.201"
+port_SO2_3.Port = 3000
+global SO2_3 = new(CCommDevice)
+SO2_3.PortObject = port_SO2_3
+SO2_3.ProtocolName = "wacl_cozi"
+
+
+// SO2_4
+global port_SO2_4 = new(CCommEthernet)
+port_SO2_4.Address = "192.168.1.202"
+port_SO2_4.Port = 3000
+global SO2_4 = new(CCommDevice)
+SO2_4.PortObject = port_SO2_4
+SO2_4.ProtocolName = "wacl_cozi"
+
+
+// SO2_5
+global port_SO2_5 = new(CCommEthernet)
+port_SO2_5.Address = "192.168.1.203"
+port_SO2_5.Port = 9001
+global SO2_5 = new(CCommDevice)
+SO2_5.PortObject = port_SO2_5
+SO2_5.ProtocolName = "wacl_cozi"
+
+
